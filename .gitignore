@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+.vite/
+
+# Env
+.env
+.env.local
+
+# Superpowers scratch (SDD workspace, brainstorm mockups)
+.superpowers/
+
+# Impeccable runtime dirs
+.impeccable/questions/
+.impeccable/mocks/
+.impeccable/review/
+
+# OS
+.DS_Store
+Thumbs.db
