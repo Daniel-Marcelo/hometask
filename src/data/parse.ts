@@ -1,5 +1,7 @@
 import type { CanDoNow, Effort, Priority, Room, Status, Task } from "./types";
 
+export type { CanDoNow, Effort, Priority, Room, Status, Task } from "./types";
+
 const STATUS_BY_LABEL: Record<string, Status> = {
   "Completed": "completed",
   "In Progress": "in_progress",
@@ -87,10 +89,15 @@ function parseCsvRows(csv: string): string[][] {
   return rows;
 }
 
-function required<T>(map: Record<string, T>, label: string, column: string): T {
+function required<T>(
+  map: Record<string, T>,
+  label: string,
+  column: string,
+  rowNumber: number,
+): T {
   const value = map[label];
   if (value === undefined) {
-    throw new Error(`Unknown ${column} value: "${label}"`);
+    throw new Error(`Row ${rowNumber}: unknown ${column} value "${label}"`);
   }
   return value;
 }
@@ -100,26 +107,64 @@ export function parseItemListCsv(csv: string): { rooms: Room[]; tasks: Task[] } 
     row.some((cell) => cell.trim() !== ""),
   );
   const [header, ...dataRows] = rows;
-  if (header === undefined) return { rooms: [], tasks: [] };
+  if (header === undefined) {
+    throw new Error("CSV is missing its header row");
+  }
+
+  // Bind columns by header name, not position, so re-ordered exports fail loudly.
+  const headerCells = header.map((cell) => cell.trim());
+  const columnOf = (name: string): number => {
+    const index = headerCells.indexOf(name);
+    if (index === -1) {
+      throw new Error(`CSV header is missing column "${name}"`);
+    }
+    return index;
+  };
+  const roomColumn = columnOf("Room");
+  const titleColumn = columnOf("Item");
+  const statusColumn = columnOf("Status");
+  const priorityColumn = columnOf("Priority");
+  const effortColumn = columnOf("Effort");
+  const canDoNowColumn = columnOf("Can be done now?");
+  const priceColumn = columnOf("Price");
+  const datePlannedColumn = columnOf("Date Planned");
+  const dateCompletedColumn = columnOf("Date Completed");
+  const effortWeightColumn = columnOf("Effort Weight");
+  const lastColumn = Math.max(
+    roomColumn,
+    titleColumn,
+    statusColumn,
+    priorityColumn,
+    effortColumn,
+    canDoNowColumn,
+    priceColumn,
+    datePlannedColumn,
+    dateCompletedColumn,
+    effortWeightColumn,
+  );
 
   const now = new Date().toISOString();
   const rooms: Room[] = [];
   const tasks: Task[] = [];
 
-  for (const row of dataRows) {
-    const [
-      roomName,
-      title,
-      status,
-      priority,
-      effort,
-      canDoNow,
-      price,
-      datePlanned,
-      dateCompleted,
-      effortWeight,
-    ] = row.map((cell) => cell.trim());
+  dataRows.forEach((row, index) => {
+    const rowNumber = index + 2; // header is row 1
+    const cells = row.map((cell) => cell.trim());
+    if (cells.length <= lastColumn) {
+      throw new Error(
+        `Row ${rowNumber} has ${cells.length} cells, expected at least ${lastColumn + 1}`,
+      );
+    }
 
+    const weight = Number(cells[effortWeightColumn]);
+    if (!Number.isFinite(weight) || weight <= 0) {
+      throw new Error(
+        `Row ${rowNumber}: invalid effort weight "${cells[effortWeightColumn]}"`,
+      );
+    }
+
+    const roomName = cells[roomColumn];
+    const title = cells[titleColumn];
     const roomId = slugify(roomName);
     if (!rooms.some((room) => room.id === roomId)) {
       rooms.push({
@@ -130,27 +175,27 @@ export function parseItemListCsv(csv: string): { rooms: Room[]; tasks: Task[] } 
       });
     }
 
-    const trimmedDatePlanned = datePlanned === "" ? null : datePlanned;
-    const trimmedDateCompleted = dateCompleted === "" ? null : dateCompleted;
+    const datePlanned = cells[datePlannedColumn];
+    const dateCompleted = cells[dateCompletedColumn];
 
     tasks.push({
       id: slugify(`${roomName}/${title}`),
       roomId,
       title,
-      status: required(STATUS_BY_LABEL, status, "status"),
-      priority: required(PRIORITY_BY_LABEL, priority, "priority"),
-      effort: required(EFFORT_BY_LABEL, effort, "effort"),
-      effortWeight: Number(effortWeight),
-      canDoNow: required(CAN_DO_NOW_BY_LABEL, canDoNow, "can-do-now"),
-      priceCents: parsePrice(price),
-      datePlanned: trimmedDatePlanned,
-      dateCompleted: trimmedDateCompleted,
+      status: required(STATUS_BY_LABEL, cells[statusColumn], "status", rowNumber),
+      priority: required(PRIORITY_BY_LABEL, cells[priorityColumn], "priority", rowNumber),
+      effort: required(EFFORT_BY_LABEL, cells[effortColumn], "effort", rowNumber),
+      effortWeight: weight,
+      canDoNow: required(CAN_DO_NOW_BY_LABEL, cells[canDoNowColumn], "can-do-now", rowNumber),
+      priceCents: parsePrice(cells[priceColumn]),
+      datePlanned: datePlanned === "" ? null : datePlanned,
+      dateCompleted: dateCompleted === "" ? null : dateCompleted,
       notes: "",
       createdAt: now,
       updatedAt: now,
       fieldUpdatedAt: {},
     });
-  }
+  });
 
   return { rooms, tasks };
 }

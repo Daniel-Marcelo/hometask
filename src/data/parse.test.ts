@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { Room, Task } from "./parse";
 import itemListCsvText from "./csv/item-list.csv?raw";
 import { parseItemListCsv, parsePrice } from "./parse";
 
@@ -102,5 +103,42 @@ describe("parsePrice", () => {
 
   it("returns null for empty cells", () => {
     expect(parsePrice("")).toBeNull();
+  });
+});
+
+describe("parseItemListCsv validation", () => {
+  const { rooms, tasks } = parseItemListCsv(itemListCsvText);
+  const header =
+    "Room,Item,Status,Priority,Effort,Can be done now?, Price,Date Planned,Date Completed,Effort Weight";
+
+  it("throws with the row number on an empty effort weight cell", () => {
+    const csv = [
+      header,
+      "All House,Fix Roof,Completed,Urgent,XL,N/A,A£0.00,,,",
+    ].join("\n");
+    expect(() => parseItemListCsv(csv)).toThrow(/row 2.*effort weight/i);
+  });
+
+  it("throws with the row number when a row is missing trailing cells", () => {
+    const csv = [
+      header,
+      "All House,Fix Roof,Completed,Urgent,XL,N/A,A£0.00,,",
+    ].join("\n");
+    expect(() => parseItemListCsv(csv)).toThrow(/row 2 has 9 cells/i);
+  });
+
+  it("throws when the header is missing an expected column", () => {
+    const csv = [
+      "Room,Item,Status,Priority,Effort,Can be done now?, Price,Date Planned,Date Completed",
+      "All House,Fix Roof,Completed,Urgent,XL,N/A,A£0.00,,",
+    ].join("\n");
+    expect(() => parseItemListCsv(csv)).toThrow(/missing column "Effort Weight"/i);
+  });
+
+  it("re-exports Room/Task types for downstream consumers", () => {
+    const room: Room | undefined = rooms[0];
+    const task: Task | undefined = tasks[0];
+    expect(room?.id).toBe("all-house");
+    expect(task?.title).toBe("Fix Roof");
   });
 });
