@@ -1,0 +1,70 @@
+Room,Item,Status,Priority,Effort,Can be done now?, Price,Date Planned,Date Completed,Effort Weight
+All House,Fix Roof,Completed,Urgent,XL,N/A,"£3,900.00",2026-11-06,2026-11-06,8
+All House,Clean Windows,Unplanned,Medium,L,Yes,,,,5
+Hallway,Buy Sideboard,Completed,Low,S,N/A,£80.00,,,2
+Hallway,Buy Rug,Completed,Low,XS,N/A,£20.00,,,1
+Hallway,Buy Shoe Cabinet,Unplanned,Low,S,Yes,,,,2
+Hallway,Renovate Grout,Unplanned,Very Low,L,Yes,,,,5
+Hallway,Remove Wall Paper,Completed,Medium,M,N/A,£0.00,,,3
+Hallway,Paint Stairs,Planned,Medium,M,Yes,,,,3
+Hallway,Renovate Staircase,Unplanned,Very Low,L,Yes,,,,5
+Main Living Room,Restore Floor,Unplanned,Medium,L,No,,,,5
+Main Living Room,Remove Wall Paper,Unplanned,Medium,M,Yes,,,,3
+Main Living Room,Fix Ceiling,Unplanned,Medium,M,Yes,,,,3
+Main Living Room,Paint,Unplanned,Medium,M,Yes,,,,3
+Main Living Room,Remove Curtains,Unplanned,Very Low,XS,Yes,,,,1
+Main Living Room,Declutter,Unplanned,Medium,S,Yes,,,,2
+Main Living Room,Buy Sofa,Unplanned,Low,M,No,,,,3
+Main Living Room,Buy TV,Unplanned,Low,M,No,,,,3
+Main Living Room,Buy TV Stand,Unplanned,Low,S,No,,,,2
+Main Living Room,Buy Curtains,Unplanned,Low,S,Yes,,,,2
+Main Living Room,Buy Coffe Table,Unplanned,Low,S,No,,,,2
+Second Living Room,Buy Curtains,Unplanned,Very Low,S,Yes,,,,2
+Second Living Room,New Floor,Unplanned,Very Low,L,No,,,,5
+Downstair Office,Remove Wall Paper,Completed,Medium,M,N/A,£0.00,,,3
+Downstair Office,Remove Curtains,Completed,Low,XS,N/A,£0.00,,,1
+Downstair Office,Paint,Planned,Medium,M,No,,,,3
+Downstair Office,New Floor,Planned,Medium,M,No,,,,3
+Downstair Office,Buy Office Chair,Completed,Urgent,S,N/A,£30.00,,,2
+Downstair Office,Buy Blinds,In Progress,Urgent,S,Yes,,,,2
+Downstair Office,Buy Curtains,Unplanned,Low,S,Yes,,,,2
+Downstair Bathroom,Fix Light,Completed,Urgent,M,N/A,£185.00,,,3
+Downstair Bathroom,Fill Floor Gaps,Unplanned,Very Low,S,Yes,,,,2
+Downstair Bathroom,Buy new sink,Unplanned,Low,M,Yes,,,,3
+Downstair Bathroom,Install new sink,Unplanned,Low,L,No,,,,5
+Downstair Bathroom,Buy Toilet Paper Holder,Completed,Very Low,XS,N/A,£4.00,,,1
+Downstair Bathroom,Buy Hand Towel Holder,Unplanned,Very Low,XS,Yes,,,,1
+Kitchen/Dining,Renovate Grout,Unplanned,Very Low,L,Yes,,,,5
+Kitchen/Dining,Remove Wall Paper,Unplanned,Medium,L,Yes,,,,5
+Kitchen/Dining,Paint,Unplanned,Medium,L,No,,,,5
+Kitchen/Dining,Remove Cables,Unplanned,Medium,S,Yes,,,,2
+Kitchen/Dining,Remove Curtains,Unplanned,Low,S,Yes,,,,2
+Kitchen/Dining,Buy Curtains,Unplanned,Medium,M,Yes,,,,3
+Utility Room,Fix Door,Completed,Medium,S,N/A,£0.00,,,2
+Utility Room,Buy Dryer,Completed,Urgent,M,N/A,£625.00,,,3
+Conservatory,Buy Rug,Unplanned,Medium,M,Yes,,,,3
+Conservatory,Return other Rug,Unplanned,Urgent,S,Yes,,,,2
+All Upstairs,New Floor,Planned,Urgent,XL,No,,,,8
+Main Bedroom,Fix Ceiling,Unplanned,Low,M,Yes,,,,3
+Main Bedroom,Fix Windows,Planned,Urgent,M,No,,,,3
+Main Bedroom,Remove Drawer,Unplanned,Low,S,Yes,,,,2
+Main Bedroom,Buy Blinds,In Progress,Low,S,Yes,,,,2
+Main Bedroom,Buy Curtains,Unplanned,Low,M,Yes,,,,3
+Main Bedroom,Buy Rug,Unplanned,Very Low,S,No,,,,2
+Main Bedroom,Buy end-of-bed bench,Unplanned,Very Low,S,No,,,,2
+Ensuite Bedroom,Fix Ceiling,Unplanned,Low,M,Yes,,,,3
+Ensuite Bedroom,Remove Wall Paper,Unplanned,Very Low,M,Yes,,,,3
+Ensuite Bedroom,Paint,Unplanned,Very Low,M,No,,,,3
+Ensuite,Fix Silicon,Unplanned,Low,S,Yes,,,,2
+Ensuite,Buy Undersink Storage,Unplanned,Very Low,S,Yes,,,,2
+Ensuite,Buy Toilet Paper Holder,Unplanned,Very Low,XS,Yes,,,,1
+Ensuite,Buy Hand Towel Holder,Unplanned,Very Low,XS,Yes,,,,1
+Ensuite,Buy Bed,Unplanned,Very Low,M,No,,,,3
+Office,Change Chandelier,Unplanned,Low,M,Yes,,,,3
+Empty Bedroom,Fix Ceiling,Unplanned,Low,M,Yes,,,,3
+Main Bathroom,Stop water from splashing,Completed,Urgent,S,N/A,£10.00,,,2
+Main Bathroom,Fix Grout,Unplanned,Medium,M,Yes,,,,3
+Main Bathroom,Paint,Unplanned,Low,S,Yes,,,,2
+Main Bathroom,New Shower Enclosure,Unplanned,Low,XL,Yes,,,,8
+Main Bathroom,Buy Toilet Paper Holder,Completed,Very Low,XS,N/A,£4.00,,,1
+Main Bathroom,Buy Hand Towel Holder,Unplanned,Very Low,XS,Yes,,,,1

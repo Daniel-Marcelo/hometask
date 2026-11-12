@@ -1,0 +1,24 @@
+,HOUSE RENOVATION PROJECT COMMAND CENTER,,,,,,
+,Total Spend,Tasks Completed,Tasks Remaining,Progress %,Urgent Action Items,Can Do Now,Total Tasks
+,"£4,858",13,56,16.1%,4,40,69
+,Recorded Costs,Finished to Date,Pending Items,Effort-Weighted Completion,High Priority Pending,Ready for Action,Active Scope
+,,,,,,,
+,Room / Area,Total Tasks,Completed,Progress,,Task Status,Count
+,Hallway,7,3,28.6%,,Completed,13
+,Main Living Room,11,0,0.0%,,In Progress,0
+,Second Living Room,2,0,0.0%,,Planned,3
+,Downstair Office,7,3,37.5%,,Unplanned,53
+,Downstair Bathroom,6,2,26.7%,,Not Started,0
+,Kitchen/Dining,6,0,0.0%,,,
+,Utility Room,2,2,100.0%,,Priority Level,Count
+,Conservatory,2,0,0.0%,,Urgent,9
+,All Upstairs,1,0,0.0%,,Medium,18
+,Main Bedroom,7,0,0.0%,,Low,23
+,Ensuite Bedroom,3,0,0.0%,,Very Low,19
+,Ensuite,5,0,0.0%,,Unassigned,0
+,Office,1,0,0.0%,,,
+,Empty Bedroom,1,0,0.0%,,Action Readiness,Count
+,Main Bathroom,6,2,17.6%,,Ready Now (Yes),40
+,All House,2,1,61.5%,,Blocked (No),16
+,Total House,69,13,16.1%,,N/A / Later,13
+,,,,,,Not Evaluated,0
