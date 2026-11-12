@@ -1,0 +1,34 @@
+/* Base page: warm cream ground, warm ink text, mobile-first centered column. */
+@import './tokens.css';
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+}
+
+#app-column {
+  max-width: 480px;
+  margin: 0 auto;
+  /* Room for the fixed bottom tab bar so content is never hidden behind it. */
+  padding-bottom: 72px;
+}
