@@ -221,6 +221,9 @@ h3 {
   background: var(--card);
   border-radius: 16px 16px 0 0;
   animation: ht-sheet-in 220ms ease-out;
+  /* Programmatic focus target: no full-panel focus ring.
+     Controls inside the sheet keep their own outlines. */
+  outline: none;
 }
 
 .ht-sheet__handle {

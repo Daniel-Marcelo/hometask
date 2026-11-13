@@ -204,6 +204,24 @@ describe('Sheet', () => {
     expect(document.activeElement).toBe(last)
   })
 
+  it('keeps focus inside the sheet across parent re-renders', () => {
+    function FocusHarness() {
+      // New inline onClose identity on every parent render — the idiom the
+      // onClose: () => void contract invites.
+      return (
+        <Sheet open={true} onClose={() => {}} title="Edit task">
+          <input aria-label="Title" />
+        </Sheet>
+      )
+    }
+    const { rerender } = render(<FocusHarness />)
+    const input = screen.getByRole('textbox', { name: 'Title' })
+    input.focus()
+    expect(document.activeElement).toBe(input)
+    rerender(<FocusHarness />)
+    expect(document.activeElement).toBe(input)
+  })
+
   it('restores focus to the previously focused element on close', () => {
     const onClose = vi.fn()
     const { rerender, container } = render(<SheetHarness open={false} onClose={onClose} />)

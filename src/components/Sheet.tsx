@@ -14,6 +14,8 @@ let bodyOverflowBeforeLock = ''
  * and Escape. Rendered in place (portal-free); one instance at a time.
  * On open, focus moves to the panel; Tab is trapped at the sheet's edges;
  * on close, focus returns to the previously focused element.
+ * The focus effect depends on `open` only — parents may pass a fresh
+ * inline `onClose` identity on every render without disturbing focus.
  */
 export function Sheet({
   open,
@@ -27,41 +29,72 @@ export function Sheet({
   children: ReactNode
 }) {
   const panelRef = useRef<HTMLElement>(null)
+  const onCloseRef = useRef(onClose)
+  const isOpenRef = useRef(false)
+  const previouslyFocusedRef = useRef<HTMLElement | null>(null)
 
-  // Focus management: move focus in on open, trap Tab at the edges,
-  // restore the previously focused element on close/unmount.
+  // Keep the latest callback available to the [open]-dependent effect
+  // without re-running it when the parent passes a new identity.
   useEffect(() => {
-    if (!open) return
-    const previouslyFocused = document.activeElement as HTMLElement | null
-    panelRef.current?.focus()
+    onCloseRef.current = onClose
+  })
 
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        onClose()
-        return
+  useEffect(() => {
+    if (open) {
+      isOpenRef.current = true
+      previouslyFocusedRef.current = document.activeElement as HTMLElement | null
+      panelRef.current?.focus()
+
+      const onKeyDown = (event: KeyboardEvent) => {
+        if (event.key === 'Escape') {
+          onCloseRef.current()
+          return
+        }
+        if (event.key !== 'Tab') return
+        const panel = panelRef.current
+        if (!panel) return
+        const focusable = Array.from(panel.querySelectorAll<HTMLElement>(FOCUSABLE))
+        if (focusable.length === 0) {
+          // Still a modal: never let Tab walk into the covered page.
+          event.preventDefault()
+          return
+        }
+        const first = focusable[0]
+        const last = focusable[focusable.length - 1]
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault()
+          last.focus()
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault()
+          first.focus()
+        }
       }
-      if (event.key !== 'Tab') return
-      const panel = panelRef.current
-      if (!panel) return
-      const focusable = Array.from(panel.querySelectorAll<HTMLElement>(FOCUSABLE))
-      if (focusable.length === 0) return
-      const first = focusable[0]
-      const last = focusable[focusable.length - 1]
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault()
-        last.focus()
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault()
-        first.focus()
+
+      window.addEventListener('keydown', onKeyDown)
+      return () => {
+        window.removeEventListener('keydown', onKeyDown)
       }
     }
 
-    window.addEventListener('keydown', onKeyDown)
+    // Closing transition: hand focus back to the opener, once per cycle.
+    if (isOpenRef.current) {
+      isOpenRef.current = false
+      previouslyFocusedRef.current?.focus()
+      previouslyFocusedRef.current = null
+    }
+    return undefined
+  }, [open])
+
+  // Unmount while open: restore focus the same way a close would.
+  useEffect(() => {
     return () => {
-      window.removeEventListener('keydown', onKeyDown)
-      previouslyFocused?.focus()
+      if (isOpenRef.current) {
+        isOpenRef.current = false
+        previouslyFocusedRef.current?.focus()
+        previouslyFocusedRef.current = null
+      }
     }
-  }, [open, onClose])
+  }, [])
 
   // Scroll containment: lock the page behind the sheet while it is open.
   useEffect(() => {
