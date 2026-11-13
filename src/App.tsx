@@ -1,5 +1,6 @@
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { TabBar } from './components/TabBar'
+import { UndoToastHost } from './features/tasks/UndoToastHost'
 import { HomePlaceholder, RoomsPlaceholder, SpendPlaceholder, TasksPlaceholder } from './pages/Placeholders'
 
 /**
@@ -19,6 +20,9 @@ export function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
         <TabBar />
+        {/* One app-level undo host outside Routes: survives row unmounts and
+            route changes, and only ever shows the newest toast. */}
+        <UndoToastHost />
       </div>
     </HashRouter>
   )
