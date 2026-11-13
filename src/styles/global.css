@@ -107,6 +107,81 @@ h3 {
   color: var(--card);
 }
 
+/* ---------- TaskRow ---------- */
+
+.ht-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--card);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+}
+
+/* Urgent gets a terracotta left rule, not a full ring. */
+.ht-row--urgent {
+  border-left: 4px solid var(--accent);
+}
+
+/* Circle checkbox: the row's primary tap target, 44px for touch. */
+.ht-row__circle {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 2px solid var(--muted);
+  background: transparent;
+  color: transparent; /* unchecked rows render no glyph */
+  font-size: 20px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+/* Completed: olive check, matching the success token. */
+.ht-row__circle--done {
+  border-color: var(--success);
+  color: var(--success);
+}
+
+.ht-row__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 0;
+  border: none;
+  background: none;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.ht-row__title {
+  font-size: 16px;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.ht-row--done .ht-row__title {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+
+.ht-row__meta {
+  font-size: 12px;
+  color: var(--muted);
+}
+
 /* ---------- UndoToast ---------- */
 
 .ht-undo {
