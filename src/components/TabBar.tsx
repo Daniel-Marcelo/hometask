@@ -65,6 +65,11 @@ export function TabBar() {
           style={({ isActive }) => ({
             ...styles.tab,
             color: isActive ? 'var(--accent)' : 'var(--muted)',
+            // Non-colour cues for the active tab (M6): top rule + weight.
+            borderTop: isActive
+              ? '2px solid var(--accent)'
+              : '2px solid transparent',
+            fontWeight: isActive ? 700 : 400,
           })}
         >
           {tab.icon}
@@ -75,7 +80,7 @@ export function TabBar() {
   )
 }
 
-const styles: Record<string, CSSProperties> = {
+const styles = {
   nav: {
     position: 'fixed',
     bottom: 0,
@@ -86,6 +91,8 @@ const styles: Record<string, CSSProperties> = {
     display: 'flex',
     background: 'var(--card)',
     borderTop: '1px solid var(--hairline)',
+    /* Content below the notch: the page column clears the same value. */
+    paddingBottom: 'env(safe-area-inset-bottom)',
   },
   tab: {
     flex: 1,
@@ -96,11 +103,13 @@ const styles: Record<string, CSSProperties> = {
     justifyContent: 'center',
     gap: '2px',
     padding: '6px 4px',
+    /* Transparent twin of the active cue so the rule never shifts layout. */
+    borderTop: '2px solid transparent',
     textDecoration: 'none',
     fontSize: '11px',
   },
   label: {
     lineHeight: 1,
   },
-}
+} satisfies Record<string, CSSProperties>
 
