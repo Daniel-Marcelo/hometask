@@ -63,8 +63,14 @@ export function createLocalRepo(): TaskRepo {
 
   if (loaded === null) {
     state = seedState();
-    lastRaw = JSON.stringify(state);
-    localStorage.setItem(STORAGE_KEY, lastRaw);
+    // Guarded: a throwing setItem (quota/security) must not take down bundle load.
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      lastRaw = JSON.stringify(state);
+    } catch (error) {
+      console.warn(`hometask: could not persist seeded state to "${STORAGE_KEY}"`, error);
+      lastRaw = null;
+    }
   } else {
     state = loaded;
     lastRaw = localStorage.getItem(STORAGE_KEY);
@@ -75,8 +81,16 @@ export function createLocalRepo(): TaskRepo {
   };
 
   const persist = (): void => {
-    lastRaw = JSON.stringify(state);
-    localStorage.setItem(STORAGE_KEY, lastRaw);
+    const raw = JSON.stringify(state);
+    try {
+      localStorage.setItem(STORAGE_KEY, raw);
+      // Track last-written raw only on success, so a failed write can never
+      // cause getState() to re-adopt the older persisted state.
+      lastRaw = raw;
+    } catch (error) {
+      console.warn(`hometask: could not persist state to "${STORAGE_KEY}"`, error);
+    }
+    // Subscribers see the in-memory mutation even when persistence failed.
     emit();
   };
 
@@ -202,7 +216,26 @@ export function createLocalRepo(): TaskRepo {
 
       return () => {
         replaceTask(snapshot);
-        enqueue({ kind: "upsert_task", task: snapshot, at: now() });
+        // The corrective op must WIN under per-field LWW: fresh-stamp every
+        // field that differs between the snapshot and the task as it stands
+        // after completion (at minimum status and dateCompleted). The
+        // in-memory restore keeps the snapshot verbatim.
+        const undoStamp = now();
+        // Diff against the task as completion left it (captured above) — the
+        // in-repo task is already the restored snapshot at this point.
+        const baseline = completed;
+        const corrective: Task = {
+          ...snapshot,
+          updatedAt: undoStamp,
+          fieldUpdatedAt: { ...snapshot.fieldUpdatedAt },
+        };
+        for (const key of Object.keys(baseline) as Array<keyof Task>) {
+          if (key === "updatedAt" || key === "fieldUpdatedAt") continue;
+          if (baseline[key] !== corrective[key]) {
+            corrective.fieldUpdatedAt[key] = undoStamp;
+          }
+        }
+        enqueue({ kind: "upsert_task", task: corrective, at: undoStamp });
         persist();
       };
     },

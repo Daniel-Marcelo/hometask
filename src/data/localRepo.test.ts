@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import itemListCsvText from "./csv/item-list.csv?raw";
 import { createLocalRepo } from "./localRepo";
+import type { Task, TaskRepo } from "./repo";
 
 const STORAGE_KEY = "hometask.v1";
 
@@ -159,7 +160,7 @@ describe("createLocalRepo completeWithUndo", () => {
     expect(completed?.fieldUpdatedAt.status).toBeDefined();
     expect(completed?.fieldUpdatedAt.dateCompleted).toBeDefined();
     expect(repo.getState().queuedOps).toHaveLength(opsBefore + 1);
-    expect(repo.getState().queuedOps.at(-1)).toMatchObject({
+    expect(repo.getState().queuedOps.at(opsBefore)).toMatchObject({
       kind: "upsert_task",
       task: { id: CLEAN_WINDOWS_ID, status: "completed" },
     });
@@ -174,6 +175,109 @@ describe("createLocalRepo completeWithUndo", () => {
     expect(restored?.fieldUpdatedAt).toEqual(snapshot?.fieldUpdatedAt);
     // Undo enqueues a corrective op so remote peers can converge.
     expect(repo.getState().queuedOps).toHaveLength(opsBefore + 2);
+  });
+
+  it("fresh-stamps the corrective undo op so it wins under per-field LWW", () => {
+    vi.useFakeTimers({ now: new Date("2026-11-13T10:00:00.000Z") });
+    const repo = createLocalRepo();
+
+    const undo = repo.completeWithUndo(CLEAN_WINDOWS_ID);
+    const completionOp = repo.getState().queuedOps.at(-1);
+    expect(completionOp).toMatchObject({ kind: "upsert_task" });
+
+    vi.setSystemTime(new Date("2026-11-13T10:00:03.000Z"));
+    undo();
+
+    const correctiveOp = repo.getState().queuedOps.at(-1);
+    expect(correctiveOp).toMatchObject({ kind: "upsert_task" });
+    // Narrow the union after the kind assertions above.
+    const correctiveTask = (correctiveOp as { task: Task }).task;
+    const completionTask = (completionOp as { task: Task }).task;
+
+    // The reverted fields carry the UNDO stamp — strictly newer than the
+    // completion's stamp — so Task 15's per-field LWW picks the reversion.
+    expect(correctiveTask.fieldUpdatedAt.status).toBe("2026-11-13T10:00:03.000Z");
+    expect(correctiveTask.fieldUpdatedAt.dateCompleted).toBe("2026-11-13T10:00:03.000Z");
+    expect(correctiveTask.fieldUpdatedAt.status > completionTask.fieldUpdatedAt.status).toBe(
+      true,
+    );
+    expect(
+      correctiveTask.fieldUpdatedAt.dateCompleted >
+        completionTask.fieldUpdatedAt.dateCompleted,
+    ).toBe(true);
+    expect(correctiveTask.updatedAt > completionTask.updatedAt).toBe(true);
+    expect(correctiveTask.status).toBe("unplanned");
+    expect(correctiveTask.dateCompleted).toBe(null);
+
+    // The in-memory restore still keeps the snapshot verbatim.
+    const restored = repo.getState().tasks.find((t) => t.id === CLEAN_WINDOWS_ID);
+    expect(restored?.status).toBe("unplanned");
+    expect(restored?.dateCompleted).toBe(null);
+  });
+});
+
+describe("createLocalRepo storage failures", () => {
+  it("survives a throwing setItem: no throw escapes, subscriber notified, state intact", () => {
+    const repo = createLocalRepo();
+    let emissions = 0;
+    const unsubscribe = repo.subscribe(() => {
+      emissions += 1;
+    });
+
+    // Simulate QuotaExceededError: setItem throws on the update path.
+    const setItemSpy = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("quota exceeded", "QuotaExceededError");
+    });
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      expect(() =>
+        repo.updateTask(CLEAN_WINDOWS_ID, { title: "Offline edit" }),
+      ).not.toThrow();
+
+      // Subscribers still see the mutation, and the in-memory state wins.
+      expect(emissions).toBe(1);
+      const after = repo.getState().tasks.find((t) => t.id === CLEAN_WINDOWS_ID);
+      expect(after?.title).toBe("Offline edit");
+      expect(after?.fieldUpdatedAt.title).toBeDefined();
+      expect(repo.getState().tasks).toHaveLength(69);
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+      // Persisted copy still holds the pre-mutation value (write failed), yet
+      // read-through must NOT revert the in-memory edit.
+      const persisted = JSON.parse(
+        localStorage.getItem(STORAGE_KEY) as string,
+      ) as { tasks: Array<{ id: string; title: string }> };
+      expect(
+        persisted.tasks.find((t) => t.id === CLEAN_WINDOWS_ID)?.title,
+      ).toBe("Clean Windows");
+      expect(repo.getState().tasks.find((t) => t.id === CLEAN_WINDOWS_ID)?.title).toBe(
+        "Offline edit",
+      );
+    } finally {
+      setItemSpy.mockRestore();
+      warnSpy.mockRestore();
+      unsubscribe();
+    }
+  });
+
+  it("warns when the seed write fails instead of crashing at import time", () => {
+    const setItemSpy = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("security error", "SecurityError");
+    });
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      let crashed: TaskRepo | null = null;
+      expect(() => {
+        crashed = createLocalRepo();
+      }).not.toThrow();
+      // The seeded state is still fully usable in memory.
+      const repoAfterCrash = crashed as unknown as TaskRepo;
+      expect(repoAfterCrash.getState().tasks).toHaveLength(69);
+      expect(repoAfterCrash.getState().rooms).toHaveLength(16);
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      setItemSpy.mockRestore();
+      warnSpy.mockRestore();
+    }
   });
 });
 
