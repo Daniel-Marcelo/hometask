@@ -21,6 +21,15 @@
   --radius: 10px;
   --radius-lg: 14px;
 
+  /* Layout — fixed bottom chrome.
+     --tabbar-h: the tab bar's real content height (44px touch target +
+     stacked icon/label padding + 1px hairline + 2px active rule = ~52px).
+     --bottom-clearance: that height plus a comfortable breathing gap; the
+     page column, Fab and UndoToast all sit above it (compose with
+     env(safe-area-inset-bottom) where the notch applies). */
+  --tabbar-h: 52px;
+  --bottom-clearance: calc(var(--tabbar-h) + 20px);
+
   /* Type */
   --font-display: Georgia, 'Times New Roman', serif; /* placeholder face; proper self-hosted serif chosen at polish time */
   --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,

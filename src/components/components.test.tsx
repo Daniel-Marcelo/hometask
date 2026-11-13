@@ -111,20 +111,32 @@ describe('Fab', () => {
 })
 
 describe('Sheet', () => {
-  const onClose = vi.fn()
+  function SheetHarness({ open, onClose }: { open: boolean; onClose: () => void }) {
+    return (
+      <div>
+        <button type="button">Opener</button>
+        <Sheet open={open} onClose={onClose} title="Edit task">
+          <button type="button">First control</button>
+          <button type="button">Last control</button>
+        </Sheet>
+      </div>
+    )
+  }
 
   it('renders nothing when closed', () => {
+    const onClose = vi.fn()
     const { container } = render(
       <Sheet open={false} onClose={onClose} title="Edit task">
         <p>Body</p>
       </Sheet>,
     )
     expect(container).toBeEmptyDOMElement()
+    expect(onClose).not.toHaveBeenCalled()
   })
 
   it('renders title and children when open', () => {
     render(
-      <Sheet open={true} onClose={onClose} title="Edit task">
+      <Sheet open={true} onClose={() => {}} title="Edit task">
         <p>Sheet body</p>
       </Sheet>,
     )
@@ -132,23 +144,90 @@ describe('Sheet', () => {
     expect(screen.getByText('Sheet body')).toBeInTheDocument()
   })
 
-  it('calls onClose on backdrop click', () => {
+  it('calls onClose exactly once on backdrop click', () => {
+    const onClose = vi.fn()
     const { container } = render(
       <Sheet open={true} onClose={onClose} title="Edit task">
         <p>Body</p>
       </Sheet>,
     )
     fireEvent.click(container.querySelector('.ht-sheet__backdrop')!)
-    expect(onClose).toHaveBeenCalled()
+    expect(onClose).toHaveBeenCalledTimes(1)
   })
 
-  it('calls onClose on Escape', () => {
+  it('calls onClose exactly once on Escape when Escape is the only interaction', () => {
+    const onClose = vi.fn()
     render(
       <Sheet open={true} onClose={onClose} title="Edit task">
         <p>Body</p>
       </Sheet>,
     )
     fireEvent.keyDown(window, { key: 'Escape' })
-    expect(onClose).toHaveBeenCalled()
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('moves focus to the sheet panel on open', () => {
+    const { container } = render(
+      <Sheet open={true} onClose={() => {}} title="Edit task">
+        <p>Body</p>
+      </Sheet>,
+    )
+    const panel = container.querySelector<HTMLElement>('.ht-sheet__panel')!
+    expect(document.activeElement).toBe(panel)
+  })
+
+  it('wraps Tab from the last focusable to the first', () => {
+    render(
+      <Sheet open={true} onClose={() => {}} title="Edit task">
+        <button type="button">First control</button>
+        <button type="button">Last control</button>
+      </Sheet>,
+    )
+    const last = screen.getByRole('button', { name: 'Last control' })
+    const first = screen.getByRole('button', { name: 'First control' })
+    last.focus()
+    fireEvent.keyDown(window, { key: 'Tab' })
+    expect(document.activeElement).toBe(first)
+  })
+
+  it('wraps Shift+Tab from the first focusable to the last', () => {
+    render(
+      <Sheet open={true} onClose={() => {}} title="Edit task">
+        <button type="button">First control</button>
+        <button type="button">Last control</button>
+      </Sheet>,
+    )
+    const last = screen.getByRole('button', { name: 'Last control' })
+    const first = screen.getByRole('button', { name: 'First control' })
+    first.focus()
+    fireEvent.keyDown(window, { key: 'Tab', shiftKey: true })
+    expect(document.activeElement).toBe(last)
+  })
+
+  it('restores focus to the previously focused element on close', () => {
+    const onClose = vi.fn()
+    const { rerender, container } = render(<SheetHarness open={false} onClose={onClose} />)
+    const opener = screen.getByRole('button', { name: 'Opener' })
+    // The user holds focus on the opener, then opens the sheet from it.
+    opener.focus()
+    rerender(<SheetHarness open={true} onClose={onClose} />)
+    expect(document.activeElement).toBe(container.querySelector('.ht-sheet__panel'))
+    rerender(<SheetHarness open={false} onClose={onClose} />)
+    expect(document.activeElement).toBe(opener)
+  })
+
+  it('locks body scroll while open and restores it on close', () => {
+    const { rerender } = render(
+      <Sheet open={true} onClose={() => {}} title="Edit task">
+        <p>Body</p>
+      </Sheet>,
+    )
+    expect(document.body.style.overflow).toBe('hidden')
+    rerender(
+      <Sheet open={false} onClose={() => {}} title="Edit task">
+        <p>Body</p>
+      </Sheet>,
+    )
+    expect(document.body.style.overflow).toBe('')
   })
 })
