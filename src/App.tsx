@@ -1,8 +1,9 @@
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { TabBar } from './components/TabBar'
 import { HomePage } from './features/home/HomePage'
+import { TaskListPage } from './features/tasks/TaskListPage'
 import { UndoToastHost } from './features/tasks/UndoToastHost'
-import { RoomsPlaceholder, SpendPlaceholder, TasksPlaceholder } from './pages/Placeholders'
+import { RoomsPlaceholder, SpendPlaceholder } from './pages/Placeholders'
 
 /**
  * App shell: centered mobile-first column, 4 bottom tabs, hash-based routing
@@ -14,7 +15,7 @@ export function App() {
       <div id="app-column">
         <Routes>
           <Route path="/" element={<HomePage />} />
-          <Route path="/tasks" element={<TasksPlaceholder />} />
+          <Route path="/tasks" element={<TaskListPage />} />
           <Route path="/rooms" element={<RoomsPlaceholder />} />
           <Route path="/spend" element={<SpendPlaceholder />} />
           {/* Unknown hashes land home instead of a blank page. */}
