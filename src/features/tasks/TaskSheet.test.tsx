@@ -129,21 +129,79 @@ describe("TaskSheet", () => {
     );
   });
 
-  it("the price field stores pounds as integer cents and never float-drifts", () => {
+  it("the price field commits on blur, never clears mid-typing, and never float-drifts", () => {
     localStorage.removeItem(STORAGE_KEY);
     const task = taskBy("Fix Windows");
 
     renderTaskSheet(task);
     const price = screen.getByLabelText("Price (£)");
-    fireEvent.change(price, { target: { value: "80.55" } });
 
-    expect(repo.getState().tasks.find((t) => t.id === task.id)?.priceCents).toBe(
-      8055,
-    );
+    // A partial draft ("80.") is local-only: the stored price is untouched.
+    fireEvent.change(price, { target: { value: "80." } });
+    expect(repo.getState().tasks.find((t) => t.id === task.id)?.priceCents).toBeNull();
+
+    // A valid full draft commits as integer cents on blur.
+    fireEvent.change(price, { target: { value: "80.55" } });
+    fireEvent.blur(price);
+    expect(repo.getState().tasks.find((t) => t.id === task.id)?.priceCents).toBe(8055);
+
+    // With a price already stored, typing "80." must NOT wipe it (the old
+    // type="number" bug turned the sanitized draft "" into priceCents null).
+    fireEvent.change(price, { target: { value: "80." } });
+    expect(repo.getState().tasks.find((t) => t.id === task.id)?.priceCents).toBe(8055);
+    fireEvent.blur(price);
+    expect(repo.getState().tasks.find((t) => t.id === task.id)?.priceCents).toBe(8000);
 
     // Empty input clears the price.
     fireEvent.change(price, { target: { value: "" } });
+    fireEvent.blur(price);
     expect(repo.getState().tasks.find((t) => t.id === task.id)?.priceCents).toBeNull();
+  });
+
+  it('"Save & done" parses the decimal draft without float drift ("80.5" → 8050)', () => {
+    localStorage.removeItem(STORAGE_KEY);
+    const task = taskBy("Buy TV");
+
+    renderTaskSheet(task);
+    fireEvent.click(screen.getByRole("button", { name: "Mark as done" }));
+    fireEvent.change(screen.getByLabelText("Add price (£)"), {
+      target: { value: "80.5" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save & done" }));
+
+    const after = repo.getState().tasks.find((t) => t.id === task.id);
+    expect(after?.status).toBe("completed");
+    expect(after?.priceCents).toBe(8050);
+  });
+
+  it('segmented "Completed" on unpriced "Buy Sofa" shows the prompt; Skip completes with null price AND dateCompleted set', () => {
+    localStorage.removeItem(STORAGE_KEY);
+    const task = taskBy("Buy Sofa");
+    expect(task.priceCents).toBeNull();
+    expect(task.dateCompleted).toBeNull();
+
+    renderTaskSheet(task);
+    fireEvent.click(screen.getByRole("button", { name: "Completed" }));
+    expect(screen.getByLabelText("Add price (£)")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Skip" }));
+    const after = repo.getState().tasks.find((t) => t.id === task.id);
+    expect(after?.status).toBe("completed");
+    expect(after?.priceCents).toBeNull();
+    expect(after?.dateCompleted).not.toBeNull();
+  });
+
+  it('segmented "Completed" on "Fill Floor Gaps" completes via the repo contract with dateCompleted set and no prompt', () => {
+    localStorage.removeItem(STORAGE_KEY);
+    const task = taskBy("Fill Floor Gaps");
+
+    renderTaskSheet(task);
+    fireEvent.click(screen.getByRole("button", { name: "Completed" }));
+
+    const after = repo.getState().tasks.find((t) => t.id === task.id);
+    expect(after?.status).toBe("completed");
+    expect(after?.dateCompleted).toBe(new Date().toISOString().slice(0, 10));
+    expect(screen.queryByLabelText("Add price (£)")).toBeNull();
   });
 
   it("delete asks for confirmation and removes the task; cancelling keeps it", () => {
@@ -220,5 +278,29 @@ describe("NewTaskSheet", () => {
     render(<NewTaskSheet open={true} onClose={() => {}} defaultRoomId={ensuiteId} />);
 
     expect(screen.getByLabelText("Room")).toHaveValue(ensuiteId);
+  });
+
+  it("re-syncs the room from the CURRENT defaultRoomId on every closed → open transition (stale-default regression)", () => {
+    localStorage.removeItem(STORAGE_KEY);
+    const onClose = vi.fn();
+    // Task 10 renders one mounted sheet whose defaultRoomId follows the
+    // active room; the room picked at mount time must never go stale.
+    const { rerender } = render(
+      <NewTaskSheet open={false} onClose={onClose} defaultRoomId="hallway" />,
+    );
+    rerender(
+      <NewTaskSheet open={true} onClose={onClose} defaultRoomId="main-bedroom" />,
+    );
+
+    fireEvent.change(screen.getByLabelText("Title"), {
+      target: { value: "Re-sync Lamp" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add task" }));
+
+    const created = repo
+      .getState()
+      .tasks.find((task) => task.title === "Re-sync Lamp");
+    expect(created?.roomId).toBe("main-bedroom");
+    expect(onClose).toHaveBeenCalledOnce();
   });
 });

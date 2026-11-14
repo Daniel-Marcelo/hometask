@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { Sheet } from "../../components/Sheet";
 import type { NewTask } from "../../data/repo";
@@ -59,6 +59,19 @@ export function NewTaskSheet({
   const [priority, setPriority] = useState<Priority>("medium");
   const [effort, setEffort] = useState<Effort>("M");
   const [canDoNow, setCanDoNow] = useState<CanDoNow>("yes");
+
+  // The sheet stays mounted while closed, so the roomId picked at mount
+  // would go stale if the caller's default room changes between openings
+  // (e.g. one mounted sheet whose defaultRoomId follows the active room).
+  // Re-sync from the CURRENT default on every closed → open transition;
+  // mid-session prop changes while open never clobber the user's choice.
+  const wasOpenRef = useRef(false);
+  useEffect(() => {
+    if (open && !wasOpenRef.current) {
+      setRoomId(defaultRoomId ?? rooms[0]?.id ?? "");
+    }
+    wasOpenRef.current = open;
+  }, [open, defaultRoomId, rooms]);
 
   const reset = (): void => {
     setTitle("");

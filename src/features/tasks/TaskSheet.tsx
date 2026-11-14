@@ -15,14 +15,25 @@ const EFFORT_WEIGHT: Record<Effort, number> = {
   XL: 8,
 };
 
-/** Pounds string → integer cents, or null when not a valid non-negative amount.
- * Rounding happens exactly once, at this input boundary — never in display code. */
-function parsePoundsToCents(raw: string): number | null {
-  const trimmed = raw.trim();
-  if (trimmed === "") return null;
-  const pounds = Number(trimmed);
-  if (!Number.isFinite(pounds) || pounds < 0) return null;
-  return Math.round(pounds * 100);
+/** What the user may type into a money field: digits, one optional dot, at
+ * most two fraction digits — so drafts like "80.", ".5" and "80.55" are all
+ * valid, while "80.555" or "1,000" are refused (the controlled value snaps
+ * back). Money inputs must be type="text": type="number" silently rewrites
+ * a trailing-dot draft to "" mid-typing. */
+const MONEY_DRAFT_RE = /^\d*\.?\d{0,2}$/;
+
+/** Strict decimal string → integer cents with no float arithmetic: the
+ * fraction is padded to exactly 2 digits instead of multiplying a float by
+ * 100 (Math.round(1.005 * 100) drifts to 100 — a 3-decimal draft can never
+ * reach here because MONEY_DRAFT_RE rejects it at the input).
+ * Callers gate input through MONEY_DRAFT_RE; "" or "." parse to null. */
+function parseMoneyToCents(raw: string): number | null {
+  const match = /^(\d*)(?:\.(\d{0,2}))?$/.exec(raw);
+  if (match === null) return null;
+  if (match[1] === "" && (match[2] ?? "") === "") return null;
+  const whole = match[1] === "" ? 0 : Number(match[1]);
+  const fraction = (match[2] ?? "").padEnd(2, "0");
+  return whole * 100 + Number(fraction);
 }
 
 /** Existing price → the pounds string shown in an input ("£"-free, 2 decimals). */
@@ -119,9 +130,11 @@ export function SegmentedControl<T extends string>({
  * stores the price then completes. The prompt is keyed to the task id, so a
  * stale flag can never leak across tasks.
  *
- * Price editing drafts locally while the user types (partial input like "8."
- * is not a valid amount yet) and commits whenever the draft parses; on blur
- * the draft is dropped so the field snaps back to the committed value.
+ * Price editing drafts locally while the user types (the field is a plain
+ * text input — `type="number"` would silently rewrite a trailing-dot draft
+ * to "") and commits on blur, so partial input like "80." can never touch
+ * or wipe the stored price; on blur the draft is dropped and the field
+ * snaps back to the committed value.
  */
 export function TaskSheet({
   task,
@@ -164,8 +177,9 @@ export function TaskSheet({
     showUndo(`Completed "${current.title}"`, () => undo());
   };
 
-  const handleMarkDone = (): void => {
-    if (completed) return;
+  /** Start completing: unpriced "Buy …" tasks get the inline price prompt
+   * first; everything else completes immediately through the repo contract. */
+  const beginComplete = (): void => {
     if (needsPrice(current)) {
       setPromptPrice({ taskId: current.id, value: "" });
     } else {
@@ -173,12 +187,36 @@ export function TaskSheet({
     }
   };
 
+  const handleMarkDone = (): void => {
+    if (completed) return;
+    beginComplete();
+  };
+
+  /** Status edits commit through updateTask — except "Completed": completion
+   * must go through the same contract as "Mark as done" (completeWithUndo,
+   * which stamps dateCompleted) so a Buy task can never bypass the price
+   * prompt and never end completed with a null dateCompleted. Selecting
+   * "Completed" on an already-completed task is a no-op. */
+  const handleStatusChange = (status: Status): void => {
+    if (status === "completed") {
+      if (!completed) beginComplete();
+      return;
+    }
+    update({ status });
+  };
+
   const handlePromptSkip = (): void => {
     complete();
   };
 
+  /** The prompt draft is local while typing and only parsed on Save & done. */
+  const handlePromptPriceChange = (value: string): void => {
+    if (!MONEY_DRAFT_RE.test(value)) return;
+    setPromptPrice({ taskId: current.id, value });
+  };
+
   const handlePromptSave = (): void => {
-    const cents = parsePoundsToCents(promptPrice?.value ?? "");
+    const cents = parseMoneyToCents(promptPrice?.value ?? "");
     // No valid amount yet: stay in the prompt until it parses or the user
     // explicitly skips — "Save & done" never silently drops the price.
     if (cents === null) return;
@@ -186,19 +224,24 @@ export function TaskSheet({
     complete();
   };
 
+  /** The draft is local while typing and only parsed for the commit on blur,
+   * so partial input like "80." can never touch the stored price. */
   const handlePriceChange = (value: string): void => {
+    if (!MONEY_DRAFT_RE.test(value)) return;
     setPriceDraft({ taskId: current.id, value });
-    if (value.trim() === "") {
-      if (current.priceCents !== null) update({ priceCents: null });
-      return;
-    }
-    const cents = parsePoundsToCents(value);
-    if (cents !== null && cents !== current.priceCents) update({ priceCents: cents });
   };
 
   const handlePriceBlur = (): void => {
+    const draft = priceDraft;
     // Drop the draft: the controlled value snaps back to repo truth.
     setPriceDraft(null);
+    if (draft === null || draft.taskId !== current.id) return;
+    if (draft.value === "") {
+      if (current.priceCents !== null) update({ priceCents: null });
+      return;
+    }
+    const cents = parseMoneyToCents(draft.value);
+    if (cents !== null && cents !== current.priceCents) update({ priceCents: cents });
   };
 
   const handleDate = (
@@ -257,7 +300,7 @@ export function TaskSheet({
           label="Status"
           value={current.status}
           options={STATUS_OPTIONS}
-          onChange={(status) => update({ status })}
+          onChange={handleStatusChange}
         />
 
         <SegmentedControl
@@ -288,10 +331,9 @@ export function TaskSheet({
           <input
             id="task-price"
             className="ht-form__input"
-            type="number"
+            type="text"
             inputMode="decimal"
-            min="0"
-            step="0.01"
+            autoComplete="off"
             placeholder="—"
             value={priceValue}
             onChange={(event) => handlePriceChange(event.target.value)}
@@ -350,17 +392,13 @@ export function TaskSheet({
               <input
                 id="task-prompt-price"
                 className="ht-form__input"
-                type="number"
+                type="text"
                 inputMode="decimal"
-                min="0"
-                step="0.01"
+                autoComplete="off"
                 autoFocus
                 value={promptPrice!.value}
                 onChange={(event) =>
-                  setPromptPrice({
-                    taskId: current.id,
-                    value: event.target.value,
-                  })
+                  handlePromptPriceChange(event.target.value)
                 }
               />
             </div>
