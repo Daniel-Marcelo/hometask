@@ -350,3 +350,163 @@ h3 {
     transition: none;
   }
 }
+
+/* ---------- Sheet forms (TaskSheet / NewTaskSheet) ---------- */
+
+.ht-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.ht-form__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.ht-form__label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.ht-form__input {
+  min-height: 44px; /* touch target */
+  padding: 10px 12px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+  font-size: 16px;
+}
+
+.ht-form__input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+textarea.ht-form__input {
+  min-height: 88px;
+  resize: vertical;
+}
+
+/* Two date inputs side by side. */
+.ht-form__row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+/* Segmented control: white card chips, hairline borders, terracotta selected. */
+.ht-seg {
+  margin: 0;
+  padding: 0;
+  border: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.ht-seg__legend {
+  padding: 0;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.ht-seg__options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ht-seg__btn {
+  min-height: 44px; /* touch target */
+  padding: 0 14px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.ht-seg__btn--on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--card);
+  font-weight: 700;
+}
+
+/* Inline price prompt shown over an unpriced "Buy …" task on completion. */
+.ht-prompt {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-lg);
+  background: var(--ground);
+}
+
+.ht-prompt__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.ht-btn {
+  flex: 1;
+  min-height: 44px; /* touch target */
+  padding: 0 14px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.ht-btn--accent {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--card);
+  font-weight: 700;
+}
+
+/* Big terracotta completion button and the bottom delete action. */
+.ht-sheet__done {
+  min-height: 48px;
+  padding: 0 16px;
+  border: none;
+  border-radius: var(--radius);
+  background: var(--accent);
+  color: var(--card);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.ht-sheet__done:active {
+  transform: scale(0.98);
+}
+
+.ht-sheet__danger {
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  background: var(--card);
+  color: var(--accent);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
