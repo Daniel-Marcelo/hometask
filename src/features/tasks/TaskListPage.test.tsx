@@ -2,7 +2,8 @@ import { cleanup, fireEvent, render, screen, within } from "@testing-library/rea
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import itemListCsvText from "../../data/csv/item-list.csv?raw";
 import { parseItemListCsv } from "../../data/parse";
-import type { Priority, Task } from "../../data/repo";
+import type { Task } from "../../data/repo";
+import type { Priority } from "../../data/types";
 import { repo } from "../../data/useRepo";
 import { TaskListPage } from "./TaskListPage";
 
