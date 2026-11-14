@@ -1,12 +1,8 @@
 /**
- * The 2 remaining placeholder routes (Home and Tasks became real pages in
- * Tasks 8 and 9). Each becomes a real page in a later task; keep the route
- * paths (`/rooms`, `/spend`) stable.
+ * The 1 remaining placeholder route (Home, Tasks and Rooms became real
+ * pages in Tasks 8, 9 and 10). It becomes a real page in a later task;
+ * keep the route path (`/spend`) stable.
  */
-export function RoomsPlaceholder() {
-  return <PagePlaceholder title="Rooms" />
-}
-
 export function SpendPlaceholder() {
   return <PagePlaceholder title="Spend" />
 }
