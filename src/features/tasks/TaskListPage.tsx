@@ -7,6 +7,7 @@ import type { Priority, Status } from "../../data/types";
 import { NewTaskSheet } from "./NewTaskSheet";
 import { TaskRow } from "./TaskRow";
 import { TaskSheet } from "./TaskSheet";
+import { downloadBackupCsv } from "../../lib/exportCsv";
 
 /** Sort rank: urgent first. */
 const PRIORITY_RANK: Record<Priority, number> = {
@@ -63,6 +64,20 @@ const chipBase = {
   font: "inherit",
   fontSize: 14,
   cursor: "pointer",
+} as const;
+
+/** Muted secondary button for the page header: the backup CSV export. */
+const exportButton = {
+  minHeight: 44,
+  padding: "0 14px",
+  borderRadius: "var(--radius)",
+  border: "1px solid var(--hairline)",
+  background: "var(--card)",
+  color: "var(--muted)",
+  font: "inherit",
+  fontSize: 14,
+  cursor: "pointer",
+  whiteSpace: "nowrap",
 } as const;
 
 /**
@@ -150,7 +165,25 @@ export function TaskListPage() {
 
   return (
     <main style={{ padding: "16px 16px 24px" }}>
-      <h1 style={{ margin: 0, fontSize: 24 }}>Tasks</h1>
+      {/* Header: title plus the backup export, clear of the sticky row. */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: 12,
+          flexWrap: "wrap",
+        }}
+      >
+        <h1 style={{ margin: 0, fontSize: 24 }}>Tasks</h1>
+        <button
+          type="button"
+          onClick={() => downloadBackupCsv(rooms, tasks)}
+          style={exportButton}
+        >
+          Export backup CSV
+        </button>
+      </div>
 
       {/* Sticky, compact filter row: three selects + the ready-now chip. */}
       <div
