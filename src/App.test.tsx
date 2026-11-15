@@ -60,4 +60,19 @@ describe('App offline banner wiring', () => {
     render(<App />)
     expect(screen.getByText('Offline — changes will sync')).toBeInTheDocument()
   })
+
+  it('renders the banner in flow ahead of the page content when offline', () => {
+    setOnline(false)
+    const { container } = render(<App />)
+
+    // First child of the app column (in-flow, no overlay).
+    const column = container.querySelector('#app-column')!
+    expect(column.firstElementChild).toHaveClass('ht-offline')
+
+    // It precedes the page heading in DOM order — it pushes content down
+    // rather than covering it.
+    const order = [...column.querySelectorAll('.ht-offline, h1')]
+    expect(order).toHaveLength(2)
+    expect(order[0]).toHaveClass('ht-offline')
+  })
 })

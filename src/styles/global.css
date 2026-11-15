@@ -236,12 +236,11 @@ h3 {
 
 /* ---------- OfflineBanner ---------- */
 
+/* In-flow at the top of the app column (first child): while offline it pushes
+   content down instead of overlaying the page heading, the Tasks sticky
+   filter row, or open sheets. */
 .ht-offline {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 60;
+  width: 100%;
   background: var(--ink);
   color: var(--ground);
   text-align: center;
