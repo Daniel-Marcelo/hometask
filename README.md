@@ -1,32 +1,26 @@
-# React + TypeScript + Vite
+# HomeTask
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+A mobile-first renovation task tracker PWA. Rooms, tasks and spend live in
+localStorage with an offline op queue, so the app keeps working without a
+network and syncs when you're back online.
 
-Currently, two official plugins are available:
+## Stack
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- React + TypeScript + Vite
+- react-router-dom with `HashRouter` (static-host friendly — no server rewrites)
+- Tailwind-free hand-rolled CSS in `src/styles/global.css`
+- `vite-plugin-pwa` for the installable shell + service worker (`autoUpdate`)
+- Vitest + Testing Library; oxlint
 
-## React Compiler
+## Scripts
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- `npm run dev` — dev server
+- `npm run build` — type-check + production build (emits `dist/manifest.webmanifest` and `dist/sw.js`)
+- `npm run preview` — serve the production build
+- `npm test` — run the test suite
+- `npm run lint` — oxlint
 
-## Expanding the Oxlint configuration
+## Data
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
-```
-
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+App state is data-local: the CSV seed under `src/data/csv/` is parsed at
+startup into localStorage; writes go to localStorage with an offline op queue.

@@ -1,0 +1,63 @@
+import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import itemListCsvText from './data/csv/item-list.csv?raw'
+import { parseItemListCsv } from './data/parse'
+import { App } from './App'
+
+// RTL auto-cleanup needs vitest globals, which this project doesn't enable.
+afterEach(cleanup)
+
+const STORAGE_KEY = 'hometask.v1'
+
+/**
+ * Restore the pristine CSV seed (same pattern as the feature-page tests):
+ * the repo singleton is module-level and persists mutations, so a prior
+ * test's writes would leak into this suite.
+ */
+function resetSeed(): void {
+  const { rooms, tasks } = parseItemListCsv(itemListCsvText)
+  localStorage.setItem(
+    STORAGE_KEY,
+    JSON.stringify({ rooms, tasks, queuedOps: [], lastSyncedAt: null }),
+  )
+}
+
+/** Stub navigator.onLine — jsdom doesn't let you assign it directly. */
+function setOnline(online: boolean): void {
+  Object.defineProperty(window.navigator, 'onLine', {
+    configurable: true,
+    value: online,
+  })
+}
+
+describe('App offline banner wiring', () => {
+  beforeEach(() => {
+    resetSeed()
+    setOnline(true)
+  })
+
+  it('hides the banner while online', () => {
+    render(<App />)
+    expect(screen.queryByText('Offline — changes will sync')).toBeNull()
+  })
+
+  it('shows the banner when the browser goes offline and hides it again on reconnect', async () => {
+    render(<App />)
+
+    window.dispatchEvent(new Event('offline'))
+    await waitFor(() =>
+      expect(screen.getByText('Offline — changes will sync')).toBeInTheDocument(),
+    )
+
+    window.dispatchEvent(new Event('online'))
+    await waitFor(() =>
+      expect(screen.queryByText('Offline — changes will sync')).toBeNull(),
+    )
+  })
+
+  it('renders the banner on mount when the app starts offline', () => {
+    setOnline(false)
+    render(<App />)
+    expect(screen.getByText('Offline — changes will sync')).toBeInTheDocument()
+  })
+})
