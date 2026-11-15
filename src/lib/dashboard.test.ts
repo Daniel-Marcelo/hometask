@@ -162,6 +162,25 @@ describe("computeDashboard edge cases (synthetic data)", () => {
     ]);
   });
 
+  it("counts only completed priced tasks in spendByRoom (pending prices are budget, not spend)", () => {
+    const rooms = [room("r1", "Room 1", 0)];
+    const tasks = [
+      task({ id: "done", roomId: "r1", title: "Done", status: "completed", priceCents: 1000, dateCompleted: "2026-01-01" }),
+      task({ id: "todo", roomId: "r1", title: "Todo", status: "planned", priceCents: 2500 }),
+    ];
+    const dashboard = computeDashboard(rooms, tasks);
+    expect(dashboard.totalSpendCents).toBe(1000);
+    expect(dashboard.budgetedCents).toBe(2500);
+    // The pending task's £25 must NOT appear in the room's spend bar —
+    // by-room bars partition the completed-only headline exactly.
+    expect(dashboard.spendByRoom).toEqual([
+      { roomId: "r1", name: "Room 1", cents: 1000 },
+    ]);
+    expect(
+      dashboard.spendByRoom.reduce((sum, entry) => sum + entry.cents, 0),
+    ).toBe(dashboard.totalSpendCents);
+  });
+
   it("handles empty rooms and zero totals without dividing by zero", () => {
     const rooms = [room("empty", "Empty", 0)];
     const dashboard = computeDashboard(rooms, []);

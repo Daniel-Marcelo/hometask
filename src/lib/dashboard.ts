@@ -64,12 +64,17 @@ export function computeDashboard(rooms: Room[], tasks: Task[]): Dashboard {
     priorityCounts[task.priority]++;
   }
 
+  // Money already spent on completed priced tasks, partitioned per room —
+  // pending prices are budget (budgetedCents), never spend.
   const spendByRoom = rooms
     .map((room) => ({
       roomId: room.id,
       name: room.name,
       cents: tasks
-        .filter((task) => task.roomId === room.id && isPriced(task))
+        .filter(
+          (task) =>
+            task.roomId === room.id && isCompleted(task) && isPriced(task),
+        )
         .reduce((sum, task) => sum + (task.priceCents ?? 0), 0),
     }))
     .filter((entry) => entry.cents > 0);
