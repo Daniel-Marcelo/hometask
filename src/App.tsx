@@ -3,9 +3,9 @@ import { TabBar } from './components/TabBar'
 import { HomePage } from './features/home/HomePage'
 import { RoomDetailPage } from './features/rooms/RoomDetailPage'
 import { RoomsPage } from './features/rooms/RoomsPage'
+import { SpendPage } from './features/spend/SpendPage'
 import { TaskListPage } from './features/tasks/TaskListPage'
 import { UndoToastHost } from './features/tasks/UndoToastHost'
-import { SpendPlaceholder } from './pages/Placeholders'
 
 /**
  * App shell: centered mobile-first column, 4 bottom tabs, hash-based routing
@@ -20,7 +20,7 @@ export function App() {
           <Route path="/tasks" element={<TaskListPage />} />
           <Route path="/rooms" element={<RoomsPage />} />
           <Route path="/rooms/:id" element={<RoomDetailPage />} />
-          <Route path="/spend" element={<SpendPlaceholder />} />
+          <Route path="/spend" element={<SpendPage />} />
           {/* Unknown hashes land home instead of a blank page. */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
