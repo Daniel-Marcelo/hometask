@@ -1,5 +1,7 @@
 import type { Room, Task } from "./types";
 
+const now = (): string => new Date().toISOString();
+
 /**
  * Snake_case row shapes matching `supabase/migrations/0001_init.sql`.
  * Kept dependency-free so the seed script (`scripts/seed-supabase.ts`,
@@ -11,6 +13,8 @@ export interface RoomRow {
   name: string;
   sort_order: number;
   archived: boolean;
+  /** Maintained by the DB (default + trigger); sent fresh on upsert. */
+  updated_at: string;
 }
 
 export interface TaskRow {
@@ -37,6 +41,8 @@ export function roomToRow(room: Room): RoomRow {
     name: room.name,
     sort_order: room.sortOrder,
     archived: room.archived,
+    // Accurate on insert; the rooms trigger overwrites it on update.
+    updated_at: now(),
   };
 }
 

@@ -10,9 +10,15 @@
  *   SUPABASE_SERVICE_ROLE_KEY service-role key, NOT the anon key — the
  *                             service role bypasses RLS, which is what lets
  *                             seeding run before any user is allowlisted.
+ *   ALLOWED_EMAILS            optional, comma-separated emails upserted into
+ *                             allowed_emails (the RLS allowlist table, which
+ *                             is service-role-managed only). Empty skips it.
  *
  * Applies 0001_init.sql to the project first (SQL editor or supabase CLI).
- * Upserts are idempotent: re-running refreshes rows by id. Never run in tests.
+ * Upserts are idempotent: re-running refreshes rows by id — but the tasks LWW
+ * merge trigger keeps stored values for fields without newer stamps, so
+ * re-seeding over an existing dataset does NOT overwrite user-modified rows
+ * (truncate public.tasks first to force a clean re-seed). Never run in tests.
  */
 
 import { readFileSync } from "node:fs";
@@ -54,6 +60,23 @@ async function upsertAll(
 // Rooms first: tasks reference rooms(id).
 await upsertAll("rooms", rooms.map(roomToRow));
 await upsertAll("tasks", tasks.map(taskToRow));
+
+// Allowlist membership is service-role-managed only (no RLS policies on the
+// table), so this is the supported way to add members.
+const allowedEmails = (process.env.ALLOWED_EMAILS ?? "")
+  .split(",")
+  .map((entry) => entry.trim().toLowerCase())
+  .filter((entry) => entry !== "");
+if (allowedEmails.length > 0) {
+  const { error } = await client
+    .from("allowed_emails")
+    .upsert(allowedEmails.map((email) => ({ email })));
+  if (error) {
+    console.error("seed-supabase: upsert into \"allowed_emails\" failed:", error.message);
+    process.exit(1);
+  }
+  console.log(`seed-supabase: allowlisted ${allowedEmails.length} email(s)`);
+}
 
 console.log(
   `seed-supabase: upserted ${rooms.length} rooms and ${tasks.length} tasks into ${url}`,

@@ -24,8 +24,13 @@ interface FakeHarness {
   handlers: Array<{ table: string; callback: (payload: ChangePayload) => void }>;
   /** Deliver a realtime payload to the handler registered for `table`. */
   deliver(table: string, payload: ChangePayload): void;
-  /** When true, upserts fail (simulates being offline). */
+  /** When true, every upsert fails with a retryable (status-less) error. */
   failUpserts: boolean;
+  /**
+   * When set, the NEXT upsert fails with exactly this error (then the knob
+   * resets), simulating a one-off permanent (4xx) or server (5xx) failure.
+   */
+  failNextUpsert: { status?: number; message: string } | null;
 }
 
 function makeFakeClient(): FakeHarness {
@@ -37,12 +42,17 @@ function makeFakeClient(): FakeHarness {
         return {
           select: () => Promise.resolve({ data: [], error: null }),
           upsert: (values: unknown) => {
-            const rows = (Array.isArray(values) ? values : [values]) as Array<
-              Record<string, unknown>
-            >;
+            if (harness.failNextUpsert !== null) {
+              const failure = harness.failNextUpsert;
+              harness.failNextUpsert = null;
+              return Promise.resolve({ error: failure });
+            }
             if (harness.failUpserts) {
               return Promise.resolve({ error: new Error("network down") });
             }
+            const rows = (Array.isArray(values) ? values : [values]) as Array<
+              Record<string, unknown>
+            >;
             sent.upserts.push({ table, rows });
             return Promise.resolve({ error: null });
           },
@@ -86,6 +96,7 @@ function makeFakeClient(): FakeHarness {
       }
     },
     failUpserts: false,
+    failNextUpsert: null,
   };
   return harness;
 }
@@ -115,6 +126,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllEnvs();
+  vi.restoreAllMocks();
 });
 
 describe("createSupabaseRepo env handling", () => {
@@ -270,5 +282,63 @@ describe("createSupabaseRepo offline flush (pinned 3)", () => {
     expect(roomRow.id).toBe(room.id);
     expect(taskRow.room_id).toBe(room.id);
     expect(taskRow.title).toBe(task.title);
+  });
+});
+
+describe("createSupabaseRepo op failure handling", () => {
+  it("drops an op rejected with a 4xx error and still flushes later ops", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const fake = makeFakeClient();
+    const repo = createSupabaseRepo({ client: fake.client });
+    await settle();
+
+    const room = repo.addRoom("Kitchen");
+    await settle();
+    fake.sent.upserts.length = 0;
+
+    // First op fails permanently; the second is enqueued while the first
+    // drain is still pending (same tick), so both sit in the queue together.
+    fake.failNextUpsert = { status: 400, message: "invalid payload" };
+    repo.addTask({ roomId: room.id, ...NEW_TASK, title: "Broken" });
+    repo.addTask({ roomId: room.id, ...NEW_TASK, title: "Fine" });
+    await settle();
+
+    // The permanently invalid op is gone from the queue; the valid op after
+    // it was flushed anyway.
+    expect(repo.getState().queuedOps).toHaveLength(0);
+    const sentTitles = fake.sent.upserts
+      .filter((u) => u.table === "tasks")
+      .flatMap((u) => u.rows.map((r) => r.title));
+    expect(sentTitles).toEqual(["Fine"]);
+    // And the drop was logged.
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining("dropping"),
+      expect.anything(),
+    );
+  });
+
+  it("keeps a retryable op queued, logs it, and flushes on the online event", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const fake = makeFakeClient();
+    fake.failNextUpsert = { status: 500, message: "server exploded" };
+    const repo = createSupabaseRepo({ client: fake.client });
+    await settle();
+
+    repo.addRoom("Garage");
+    await settle();
+
+    expect(repo.getState().queuedOps).toHaveLength(1); // upsert_room kept
+    expect(fake.sent.upserts).toHaveLength(0);
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining("will retry"),
+      expect.anything(),
+    );
+
+    fake.failNextUpsert = null;
+    window.dispatchEvent(new Event("online"));
+    await settle();
+
+    expect(repo.getState().queuedOps).toHaveLength(0);
+    expect(fake.sent.upserts.map((u) => u.table)).toEqual(["rooms"]);
   });
 });

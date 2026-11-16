@@ -109,13 +109,16 @@ function uniqueSlug(base: string, taken: Set<string>): string {
  * - Mutations apply locally first (same semantics as the local repo), enqueue
  *   a `QueuedOp`, then attempt a flush. A failed write (offline) leaves the op
  *   queued; a later mutation or the window `online` event retries.
+ * - Op failures are classified: retryable (transport errors, 5xx) stays
+ *   queued; permanent (4xx) is dropped after logging so one invalid op can
+ *   never block the rest of the queue. Every failure is logged.
  * - Realtime changes from other clients are merged per-field by LWW: a field
  *   is applied only when the remote `field_updated_at` stamp beats the local
  *   stamp for that field (missing local stamp counts as the epoch).
- * - Known simplification: flush sends whole-row upserts, so two devices
- *   editing different fields of the same task near-simultaneously can clobber
- *   each other server-side (the per-field LWW here only protects each
- *   client's display). A Postgres merge trigger would close that gap.
+ * - Whole-row upsert clobber is handled server-side: the migration installs a
+ *   `tasks` merge trigger that applies an incoming row only where its per-
+ *   field stamp is strictly newer than the stored one. Clients converge on
+ *   the server's merged result via realtime.
  */
 export function createSupabaseRepo(opts?: { client?: SupabaseClientLike }): TaskRepo {
   const client = opts?.client ?? createEnvClient();
@@ -243,8 +246,23 @@ export function createSupabaseRepo(opts?: { client?: SupabaseClientLike }): Task
 
   // —————————————————————————————————————— offline queue / flush ——————
 
-  /** Sends one op; returns true when the write failed (op stays queued). */
-  async function sendOp(op: QueuedOp): Promise<boolean> {
+  /** Where a sent op ended up: written, retry later, or drop it. */
+  type SendResult = "ok" | "retryable" | "permanent";
+
+  /**
+   * Transport failures and error objects without a status are retryable;
+   * a PostgREST 4xx means the op itself is invalid and would fail forever.
+   */
+  function classifyError(error: unknown): "retryable" | "permanent" {
+    const status = (error as { status?: unknown } | null)?.status;
+    if (typeof status === "number" && status >= 400 && status < 500) {
+      return "permanent";
+    }
+    return "retryable";
+  }
+
+  /** Sends one op and classifies the outcome; failures are logged. */
+  async function sendOp(op: QueuedOp): Promise<SendResult> {
     try {
       let result: { error: unknown };
       switch (op.kind) {
@@ -258,9 +276,19 @@ export function createSupabaseRepo(opts?: { client?: SupabaseClientLike }): Task
           result = await client.from("tasks").delete().eq("id", op.taskId);
           break;
       }
-      return result.error != null;
-    } catch {
-      return true; // transport failure — keep the op queued
+      if (result.error == null) return "ok";
+      const outcome = classifyError(result.error);
+      console.warn(
+        `hometask: ${outcome === "permanent" ? "dropping" : "will retry"} queued op "${op.kind}"`,
+        result.error,
+      );
+      return outcome;
+    } catch (error) {
+      console.warn(
+        `hometask: transport failure for queued op "${op.kind}"; will retry`,
+        error,
+      );
+      return "retryable";
     }
   }
 
@@ -276,20 +304,22 @@ export function createSupabaseRepo(opts?: { client?: SupabaseClientLike }): Task
     let progressed = false;
     try {
       while (state.queuedOps.length > 0) {
-        const failed = await sendOp(state.queuedOps[0]);
-        if (failed) return;
+        const result = await sendOp(state.queuedOps[0]);
+        if (result === "retryable") return; // stop the drain; op stays queued
         state = {
           ...state,
           queuedOps: state.queuedOps.slice(1),
-          lastSyncedAt: now(),
+          lastSyncedAt: result === "ok" ? now() : state.lastSyncedAt,
         };
+        // A dropped permanent op also counts as progress: it must not block
+        // later ops, and a mid-drain enqueue deserves its own pass.
         progressed = true;
         emit();
       }
     } finally {
       flushing = false;
-      // Ops enqueued while a successful drain was in flight get their own
-      // pass; a failed drain stops here (no spin) until the next trigger.
+      // Ops enqueued while a drain was in flight get their own pass; a
+      // retryable failure stops here (no spin) until the next trigger.
       if (progressed && state.queuedOps.length > 0) requestFlush();
     }
   }
