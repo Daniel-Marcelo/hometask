@@ -40,30 +40,48 @@ function makeFakeClient(): FakeHarness {
     client: {
       from(table: string) {
         return {
-          select: () => Promise.resolve({ data: [], error: null }),
+          select: () => Promise.resolve({ data: [], error: null, status: 200 }),
           upsert: (values: unknown) => {
             if (harness.failNextUpsert !== null) {
+              // Real supabase-js shape: PostgrestError body on `error`, HTTP
+              // status on the envelope (never on the error object).
               const failure = harness.failNextUpsert;
               harness.failNextUpsert = null;
-              return Promise.resolve({ error: failure });
+              return Promise.resolve({
+                data: null,
+                error: {
+                  message: failure.message,
+                  details: null,
+                  hint: null,
+                  code: null,
+                },
+                status: failure.status,
+              });
             }
             if (harness.failUpserts) {
-              return Promise.resolve({ error: new Error("network down") });
+              // Network-style failure: no envelope status at all.
+              return Promise.resolve({
+                data: null,
+                error: { message: "network down" },
+              });
             }
             const rows = (Array.isArray(values) ? values : [values]) as Array<
               Record<string, unknown>
             >;
             sent.upserts.push({ table, rows });
-            return Promise.resolve({ error: null });
+            return Promise.resolve({ data: null, error: null, status: 201 });
           },
           delete: () => ({
             eq: (column: string, value: unknown) => {
               void column;
               if (harness.failUpserts) {
-                return Promise.resolve({ error: new Error("network down") });
+                return Promise.resolve({
+                  data: null,
+                  error: { message: "network down" },
+                });
               }
               sent.deletes.push({ table, id: String(value) });
-              return Promise.resolve({ error: null });
+              return Promise.resolve({ data: null, error: null, status: 204 });
             },
           }),
         };
@@ -286,7 +304,7 @@ describe("createSupabaseRepo offline flush (pinned 3)", () => {
 });
 
 describe("createSupabaseRepo op failure handling", () => {
-  it("drops an op rejected with a 4xx error and still flushes later ops", async () => {
+  it("drops an op whose 400 response envelope says so, and still flushes later ops", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const fake = makeFakeClient();
     const repo = createSupabaseRepo({ client: fake.client });
@@ -298,6 +316,7 @@ describe("createSupabaseRepo op failure handling", () => {
 
     // First op fails permanently; the second is enqueued while the first
     // drain is still pending (same tick), so both sit in the queue together.
+    // The status rides the response envelope, like the real client.
     fake.failNextUpsert = { status: 400, message: "invalid payload" };
     repo.addTask({ roomId: room.id, ...NEW_TASK, title: "Broken" });
     repo.addTask({ roomId: room.id, ...NEW_TASK, title: "Fine" });
@@ -315,6 +334,36 @@ describe("createSupabaseRepo op failure handling", () => {
       expect.stringContaining("dropping"),
       expect.anything(),
     );
+  });
+
+  it("keeps an op queued when the response envelope says 403 and stops the drain", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const fake = makeFakeClient();
+    const repo = createSupabaseRepo({ client: fake.client });
+    await settle();
+
+    fake.failNextUpsert = {
+      status: 403,
+      message: "new row violates row-level security policy",
+    };
+    repo.addRoom("Garage");
+    await settle();
+
+    // 403 is recoverable (not-yet-allowlisted user): the op stays queued and
+    // the drain stops instead of dropping it.
+    expect(repo.getState().queuedOps).toHaveLength(1);
+    expect(fake.sent.upserts).toHaveLength(0);
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining("will retry"),
+      expect.anything(),
+    );
+
+    fake.failNextUpsert = null;
+    window.dispatchEvent(new Event("online"));
+    await settle();
+
+    expect(repo.getState().queuedOps).toHaveLength(0);
+    expect(fake.sent.upserts.map((u) => u.table)).toEqual(["rooms"]);
   });
 
   it("keeps a retryable op queued, logs it, and flushes on the online event", async () => {

@@ -44,12 +44,23 @@ export interface ChangePayload {
   old: unknown;
 }
 
+/**
+ * What supabase-js resolves for a table request: the awaited response
+ * envelope. The HTTP status lives HERE (top level), not on the error body —
+ * a PostgrestError is `{ message, details, hint, code }` with no status.
+ */
+export interface SupabaseResponseLike {
+  data: unknown;
+  error: unknown;
+  status?: number;
+}
+
 export interface SupabaseTableLike {
-  select(): PromiseLike<{ data: unknown; error: unknown }>;
+  select(): PromiseLike<SupabaseResponseLike>;
   /** Row objects in the wire (snake_case) shape; typed loosely at the boundary. */
-  upsert(values: unknown): PromiseLike<{ error: unknown }>;
+  upsert(values: unknown): PromiseLike<SupabaseResponseLike>;
   delete(): {
-    eq(column: string, value: unknown): PromiseLike<{ error: unknown }>;
+    eq(column: string, value: unknown): PromiseLike<SupabaseResponseLike>;
   };
 }
 
@@ -250,21 +261,40 @@ export function createSupabaseRepo(opts?: { client?: SupabaseClientLike }): Task
   type SendResult = "ok" | "retryable" | "permanent";
 
   /**
-   * Transport failures and error objects without a status are retryable;
-   * a PostgREST 4xx means the op itself is invalid and would fail forever.
+   * 4xx responses mean the op itself is invalid and would fail forever —
+   * EXCEPT these four, whose failures are about the session/conditions, not
+   * the op: 401 (expired-but-refreshable token), 403 (e.g. RLS denial for a
+   * not-yet-allowlisted user), 408 (timeout), 429 (rate limit). Dropping any
+   * of those would silently lose the op, so they stay queued.
    */
-  function classifyError(error: unknown): "retryable" | "permanent" {
-    const status = (error as { status?: unknown } | null)?.status;
-    if (typeof status === "number" && status >= 400 && status < 500) {
-      return "permanent";
-    }
-    return "retryable";
+  const RETRYABLE_4XX = new Set([401, 403, 408, 429]);
+
+  /**
+   * The HTTP status lives on the supabase-js response ENVELOPE, not on the
+   * error body (PostgrestError is `{ message, details, hint, code }`).
+   * Fallbacks when no envelope status is present (transport/network errors
+   * like FetchError): check the error object for a legacy `status` field,
+   * otherwise treat as retryable — we cannot prove the op is permanently
+   * invalid, and retrying never loses data. PostgrestError `code` (a Postgres
+   * SQLSTATE) is deliberately NOT used to decide permanence: e.g. 42501
+   * (insufficient_privilege, the RLS denial) must be retried, not dropped.
+   */
+  function isPermanentResult(result: {
+    error: unknown;
+    status?: number;
+  }): boolean {
+    const status =
+      typeof result.status === "number"
+        ? result.status
+        : (result.error as { status?: unknown } | null)?.status;
+    if (typeof status !== "number") return false;
+    return status >= 400 && status < 500 && !RETRYABLE_4XX.has(status);
   }
 
   /** Sends one op and classifies the outcome; failures are logged. */
   async function sendOp(op: QueuedOp): Promise<SendResult> {
+    let result: SupabaseResponseLike;
     try {
-      let result: { error: unknown };
       switch (op.kind) {
         case "upsert_room":
           result = await client.from("rooms").upsert(roomToRow(op.room));
@@ -276,13 +306,6 @@ export function createSupabaseRepo(opts?: { client?: SupabaseClientLike }): Task
           result = await client.from("tasks").delete().eq("id", op.taskId);
           break;
       }
-      if (result.error == null) return "ok";
-      const outcome = classifyError(result.error);
-      console.warn(
-        `hometask: ${outcome === "permanent" ? "dropping" : "will retry"} queued op "${op.kind}"`,
-        result.error,
-      );
-      return outcome;
     } catch (error) {
       console.warn(
         `hometask: transport failure for queued op "${op.kind}"; will retry`,
@@ -290,6 +313,13 @@ export function createSupabaseRepo(opts?: { client?: SupabaseClientLike }): Task
       );
       return "retryable";
     }
+    if (result.error == null) return "ok";
+    const permanent = isPermanentResult(result);
+    console.warn(
+      `hometask: ${permanent ? "dropping" : "will retry"} queued op "${op.kind}"`,
+      result.error,
+    );
+    return permanent ? "permanent" : "retryable";
   }
 
   let flushing = false;
