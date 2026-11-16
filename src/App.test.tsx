@@ -2,6 +2,7 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import itemListCsvText from './data/csv/item-list.csv?raw'
 import { parseItemListCsv } from './data/parse'
+import { SESSION_KEY } from './lib/auth'
 import { App } from './App'
 
 // RTL auto-cleanup needs vitest globals, which this project doesn't enable.
@@ -34,6 +35,9 @@ describe('App offline banner wiring', () => {
   beforeEach(() => {
     resetSeed()
     setOnline(true)
+    // The app shell renders only for a signed-in user (Task 14): the auth
+    // gate resolves the persisted session on mount.
+    localStorage.setItem(SESSION_KEY, JSON.stringify({ email: 'test@example.com' }))
   })
 
   it('hides the banner while online', () => {

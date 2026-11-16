@@ -509,3 +509,113 @@ textarea.ht-form__input {
   font-size: 14px;
   cursor: pointer;
 }
+
+/* ---------- Auth (AuthGate splash / SignInPage) ---------- */
+
+/* Splash while the session is restored: the app name on the warm ground. */
+.ht-splash {
+  min-height: 100vh;
+  min-height: 100svh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--ground);
+}
+
+.ht-splash__name {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 28px;
+  color: var(--ink);
+}
+
+/* Sign-in screen: its own centred column (the app column is gated away). */
+.ht-auth {
+  min-height: 100vh;
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 24px 20px calc(24px + env(safe-area-inset-bottom));
+}
+
+.ht-auth__title {
+  margin: 0 0 6px;
+  font-size: 30px;
+}
+
+.ht-auth__lede {
+  margin: 0 0 14px;
+  color: var(--muted);
+  font-size: 15px;
+}
+
+.ht-auth__form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ht-auth__label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.ht-auth__input {
+  min-height: 44px; /* touch target */
+  padding: 10px 12px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+  font-size: 16px;
+}
+
+.ht-auth__input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.ht-auth__error {
+  margin: 0;
+  color: var(--accent);
+  font-size: 14px;
+}
+
+/* Terracotta primary action — the same accent the rest of the app uses. */
+.ht-auth__submit {
+  min-height: 44px; /* touch target */
+  margin-top: 12px;
+  padding: 0 16px;
+  border: none;
+  border-radius: var(--radius);
+  background: var(--accent);
+  color: var(--card);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.ht-auth__submit:active {
+  transform: scale(0.98);
+}
+
+.ht-auth__sent {
+  margin: 0 0 4px;
+  font-family: var(--font-display);
+  font-size: 22px;
+}
+
+.ht-auth__hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
