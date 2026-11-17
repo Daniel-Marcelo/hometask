@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ProgressBar } from "../../components/ProgressBar";
 import { StatTile } from "../../components/StatTile";
 import type { Task } from "../../data/repo";
 import { useRepoState } from "../../data/useRepo";
@@ -39,22 +38,63 @@ const sectionList = {
   gap: 8,
 } as const;
 
-const roomRow = {
+/**
+ * Compact rooms summary: one horizontally scrollable row of pills so all
+ * 16 rooms stay reachable without pushing Ready-now out of the first
+ * viewport. A pill still opens the room's detail page; the "See all rooms"
+ * row goes to the full index.
+ */
+const chipRow = {
+  listStyle: "none",
+  margin: 0,
+  padding: "0 0 4px",
+  display: "flex",
+  gap: 8,
+  overflowX: "auto",
+} as const;
+
+const chip = {
+  flex: "none",
+  minHeight: 44,
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 6,
+  padding: "0 14px",
+  background: "var(--card)",
+  border: "1px solid var(--hairline)",
+  borderRadius: 999,
+  font: "inherit",
+  fontSize: 14,
+  color: "var(--ink)",
+  whiteSpace: "nowrap",
+  cursor: "pointer",
+} as const;
+
+const chipCount = {
+  fontSize: 12,
+  color: "var(--muted)",
+} as const;
+
+const seeAll = {
   width: "100%",
   minHeight: 44,
-  flexDirection: "column",
-  alignItems: "stretch",
-  gap: 6,
-  textAlign: "left",
+  display: "flex",
+  justifyContent: "center",
   font: "inherit",
+  fontSize: 15,
+  fontWeight: 600,
+  color: "var(--accent)",
+  background: "none",
+  border: "none",
   cursor: "pointer",
 } as const;
 
 /**
  * Home, the command center: greeting, three headline tiles (the sheet's
- * numbers straight from computeDashboard), one progress row per room, and
- * the ready-now list ordered by urgency. Tapping a room row goes to its
- * detail; tapping a ready task opens the same TaskSheet the Tasks page uses.
+ * numbers straight from computeDashboard), a compact rooms summary (chip
+ * row + see-all link), and the ready-now list ordered by urgency. Tapping
+ * a room chip goes to its detail; tapping a ready task opens the same
+ * TaskSheet the Tasks page uses.
  */
 export function HomePage() {
   const { rooms, tasks } = useRepoState();
@@ -126,36 +166,30 @@ export function HomePage() {
       </div>
 
       <h2 style={{ margin: "20px 0 8px", fontSize: 18 }}>Rooms</h2>
-      <ul aria-label="Rooms" style={sectionList}>
+      <ul aria-label="Rooms" style={chipRow}>
         {dashboard.roomProgress.map((room) => (
           <li key={room.roomId}>
             <button
               type="button"
               aria-label={`Open ${room.name}`}
-              className="ht-row"
-              style={roomRow}
+              style={chip}
               onClick={() => navigate(`/rooms/${room.roomId}`)}
             >
-              <span
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "baseline",
-                  gap: 8,
-                }}
-              >
-                <span style={{ fontSize: 16, color: "var(--ink)" }}>
-                  {room.name}
-                </span>
-                <span style={{ fontSize: 12, color: "var(--muted)" }}>
-                  {room.completed}/{room.total}
-                </span>
+              {room.name}
+              <span style={chipCount}>
+                {room.completed}/{room.total}
               </span>
-              <ProgressBar pct={room.pct} />
             </button>
           </li>
         ))}
       </ul>
+      <button
+        type="button"
+        style={seeAll}
+        onClick={() => navigate("/rooms")}
+      >
+        See all rooms →
+      </button>
 
       <h2 style={{ margin: "20px 0 8px", fontSize: 18 }}>
         Ready now ({dashboard.readyNow})

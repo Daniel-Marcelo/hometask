@@ -89,39 +89,37 @@ describe("HomePage", () => {
     expect(screen.queryByText(/budgeted, not spent/)).toBeNull();
   });
 
-  it("lists every room in sortOrder with x/y counts and progress bars", () => {
+  it("summarises all 16 rooms as compact chips with x/y counts", () => {
     renderHome();
     const rooms = screen.getByRole("list", { name: "Rooms" });
-    const rows = within(rooms).getAllByRole("button");
-    expect(rows).toHaveLength(16);
+    const chips = within(rooms).getAllByRole("button");
+    expect(chips).toHaveLength(16);
 
-    // Utility Room: all 2 tasks completed — full bar.
+    // Counts survive the compact form: Utility Room is 2/2, Hallway 3/7.
     const utility = within(rooms).getByRole("button", {
       name: "Open Utility Room",
     });
     expect(within(utility).getByText("2/2")).toBeInTheDocument();
-    expect(within(utility).getByRole("progressbar")).toHaveAttribute(
-      "aria-valuenow",
-      "100",
-    );
-
-    // Hallway: 3 of 7 done → 6/21 effort weight = 28.6% → rounds to 29.
     const hallway = within(rooms).getByRole("button", {
       name: "Open Hallway",
     });
     expect(within(hallway).getByText("3/7")).toBeInTheDocument();
-    expect(within(hallway).getByRole("progressbar")).toHaveAttribute(
-      "aria-valuenow",
-      "29",
-    );
   });
 
-  it("tapping a room row navigates to /rooms/:id", () => {
+  it("tapping a room chip navigates to /rooms/:id", () => {
     const { pathname } = renderHome();
     fireEvent.click(
       screen.getByRole("button", { name: "Open Utility Room" }),
     );
     expect(pathname()).toBe("/rooms/utility-room");
+  });
+
+  it("See all rooms navigates to /rooms", () => {
+    const { pathname } = renderHome();
+    fireEvent.click(
+      screen.getByRole("button", { name: "See all rooms →" }),
+    );
+    expect(pathname()).toBe("/rooms");
   });
 
   it("the ready-now list holds the 40 ready pending tasks, urgent first", () => {
