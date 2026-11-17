@@ -5,6 +5,40 @@ import type { NewTask, QueuedOp } from "./repo";
 
 const STORAGE_KEY = "hometask.v1";
 
+/**
+ * Last `persist()` outcome, shared module-level so the app shell can show a
+ * storage warning without reaching into a repo instance. Cleared by the next
+ * successful write.
+ */
+let persistFailed = false;
+const persistFailureListeners = new Set<() => void>();
+
+function setPersistFailed(failed: boolean): void {
+  if (persistFailed === failed) return;
+  persistFailed = failed;
+  for (const listener of persistFailureListeners) listener();
+}
+
+/** Subscribe to persist-failure changes (for useSyncExternalStore). */
+export function subscribePersistFailed(listener: () => void): () => void {
+  persistFailureListeners.add(listener);
+  return () => {
+    persistFailureListeners.delete(listener);
+  };
+}
+
+/** Whether the most recent `persist()` attempt failed. */
+export function isPersistFailed(): boolean {
+  return persistFailed;
+}
+
+/** The task a queued op targets, or null for room ops. */
+function opTaskId(op: QueuedOp): string | null {
+  if (op.kind === "upsert_task") return op.task.id;
+  if (op.kind === "delete_task") return op.taskId;
+  return null;
+}
+
 const now = (): string => new Date().toISOString();
 const today = (): string => new Date().toISOString().slice(0, 10);
 
@@ -87,15 +121,34 @@ export function createLocalRepo(): TaskRepo {
       // Track last-written raw only on success, so a failed write can never
       // cause getState() to re-adopt the older persisted state.
       lastRaw = raw;
+      setPersistFailed(false);
     } catch (error) {
       console.warn(`hometask: could not persist state to "${STORAGE_KEY}"`, error);
+      setPersistFailed(true);
     }
     // Subscribers see the in-memory mutation even when persistence failed.
     emit();
   };
 
+  /**
+   * Queue one sync op, compacting to the latest op per task id: an upsert
+   * replaces earlier upserts for the same task, and a delete replaces every
+   * op for it. Safe under per-field LWW — the surviving op carries the
+   * freshest task snapshot / stamps. Room ops are left untouched.
+   */
   const enqueue = (op: QueuedOp): void => {
-    state = { ...state, queuedOps: [...state.queuedOps, op] };
+    let queued = state.queuedOps;
+    if (op.kind === "upsert_task") {
+      const id = op.task.id;
+      queued = queued.filter(
+        (existing) =>
+          !(existing.kind === "upsert_task" && existing.task.id === id),
+      );
+    } else if (op.kind === "delete_task") {
+      const id = op.taskId;
+      queued = queued.filter((existing) => opTaskId(existing) !== id);
+    }
+    state = { ...state, queuedOps: [...queued, op] };
   };
 
   const findTask = (id: string): Task | undefined =>

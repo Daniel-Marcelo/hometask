@@ -127,6 +127,38 @@ describe("TaskRow", () => {
     expect(screen.getByText("Hallway · S")).toBeInTheDocument();
   });
 
+  it('clicking the circle on an unpriced "Buy …" task opens the sheet instead of completing', () => {
+    const task = taskBy("Buy new sink");
+    expect(task.priceCents).toBeNull();
+    expect(task.status).not.toBe("completed");
+
+    const { onOpen } = renderRow(task);
+    fireEvent.click(screen.getByRole("button", { name: `Complete "Buy new sink"` }));
+
+    // No silent completion: the sheet's price prompt takes over.
+    expect(onOpen).toHaveBeenCalledOnce();
+    expect(onOpen).toHaveBeenCalledWith(task);
+    expect(repo.getState().tasks.find((t) => t.id === task.id)?.status).not.toBe(
+      "completed",
+    );
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+
+  it('a priced "Buy …" task still completes instantly from the circle', () => {
+    const task = taskBy("Buy new sink");
+    repo.updateTask(task.id, { priceCents: 12500 });
+    const priced = repo.getState().tasks.find((t) => t.id === task.id)!;
+
+    const { onOpen } = renderRow(priced);
+    fireEvent.click(screen.getByRole("button", { name: `Complete "Buy new sink"` }));
+
+    expect(onOpen).not.toHaveBeenCalled();
+    const after = repo.getState().tasks.find((t) => t.id === task.id);
+    expect(after?.status).toBe("completed");
+    expect(after?.priceCents).toBe(12500);
+    expect(screen.getByText(`Completed "Buy new sink"`)).toBeInTheDocument();
+  });
+
   it("renders the terracotta left-rule for urgent tasks only", () => {
     const urgent = taskBy("Fix Windows");
     const { container } = render(<TaskRow task={urgent} onOpen={() => {}} />);
@@ -198,7 +230,7 @@ describe("TaskRow", () => {
   it("two completions within 5s show only the newest toast; the first undo never fires", () => {
     vi.useFakeTimers();
     const first = taskBy("Fill Floor Gaps");
-    const second = taskBy("Buy new sink");
+    const second = taskBy("Declutter");
     render(
       <>
         <TaskRow task={first} onOpen={() => {}} />
@@ -210,10 +242,10 @@ describe("TaskRow", () => {
     fireEvent.click(screen.getByRole("button", { name: `Complete "Fill Floor Gaps"` }));
     expect(screen.getByText(`Completed "Fill Floor Gaps"`)).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: `Complete "Buy new sink"` }));
+    fireEvent.click(screen.getByRole("button", { name: `Complete "Declutter"` }));
     // The later toast owns the spot; the earlier one is gone (its timer was
     // cancelled by the second show).
-    expect(screen.getByText(`Completed "Buy new sink"`)).toBeInTheDocument();
+    expect(screen.getByText(`Completed "Declutter"`)).toBeInTheDocument();
     expect(screen.queryByText(`Completed "Fill Floor Gaps"`)).toBeNull();
 
     act(() => {

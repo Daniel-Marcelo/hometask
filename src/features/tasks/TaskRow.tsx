@@ -1,6 +1,7 @@
 import { PriorityChip } from "../../components/PriorityChip";
 import type { Task } from "../../data/repo";
 import { repo, useRepoState } from "../../data/useRepo";
+import { needsPricePrompt } from "./pricePrompt";
 import { showUndo } from "./undoStore";
 
 /**
@@ -11,6 +12,10 @@ import { showUndo } from "./undoStore";
  * toast for a 5-second window — the row can unmount without killing the
  * pending undo, and undo lives only in the toast (tapping a completed
  * row's circle does nothing).
+ *
+ * Unpriced "Buy …" tasks are the exception: the circle opens the sheet
+ * instead of completing, so the same skippable price prompt as "Mark as
+ * done" can run — the primary one-tap path must never bypass it.
  *
  * The row re-reads the task by id from repo state on every render, so a
  * stale `task` prop (e.g. a parent rendering from a cached list) can never
@@ -31,6 +36,12 @@ export function TaskRow({
 
   const handleComplete = (): void => {
     if (completed) return;
+    // Hand off to the sheet's existing prompt flow rather than completing
+    // silently; everything else still completes in one tap.
+    if (needsPricePrompt(current)) {
+      onOpen(current);
+      return;
+    }
     const undo = repo.completeWithUndo(current.id);
     // The host owns the toast and the undo closure for the full window.
     showUndo(`Completed "${current.title}"`, () => undo());

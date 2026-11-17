@@ -1,12 +1,17 @@
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { Room, Task } from "../../data/types";
 import itemListCsvText from "../../data/csv/item-list.csv?raw";
 import { parseItemListCsv } from "../../data/parse";
+import { AuthGate } from "../auth/AuthGate";
+import { SESSION_KEY } from "../../lib/auth";
 import { SpendPage } from "./SpendPage";
 
 // RTL auto-cleanup needs vitest globals, which this project doesn't enable.
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  localStorage.removeItem(SESSION_KEY);
+});
 
 const STORAGE_KEY = "hometask.v1";
 
@@ -108,6 +113,28 @@ function renderSpend() {
 }
 
 describe("SpendPage", () => {
+  it("shows the signed-in email and signs out back to the sign-in page", async () => {
+    localStorage.setItem(
+      SESSION_KEY,
+      JSON.stringify({ email: "dan@example.com" }),
+    );
+    render(
+      <AuthGate>
+        <SpendPage />
+      </AuthGate>,
+    );
+
+    expect(
+      await screen.findByText("Signed in as dan@example.com"),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
+
+    expect(
+      await screen.findByRole("button", { name: "Send magic link" }),
+    ).toBeInTheDocument();
+    expect(localStorage.getItem(SESSION_KEY)).toBeNull();
+  });
+
   it("shows the recorded-costs headline from the real seed", () => {
     renderSpend();
     expect(screen.getByText("Recorded costs")).toBeInTheDocument();

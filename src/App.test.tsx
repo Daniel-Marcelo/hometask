@@ -1,7 +1,8 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import itemListCsvText from './data/csv/item-list.csv?raw'
 import { parseItemListCsv } from './data/parse'
+import { repo } from './data/useRepo'
 import { SESSION_KEY } from './lib/auth'
 import { App } from './App'
 
@@ -78,5 +79,33 @@ describe('App offline banner wiring', () => {
     const order = [...column.querySelectorAll('.ht-offline, h1')]
     expect(order).toHaveLength(2)
     expect(order[0]).toHaveClass('ht-offline')
+  })
+
+  it('shows a storage warning after a failed persist and clears it on the next success', () => {
+    const warning = 'Storage is full — recent changes may not be saved'
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const setItemSpy = vi
+      .spyOn(Storage.prototype, 'setItem')
+      .mockImplementation(() => {
+        throw new DOMException('quota exceeded', 'QuotaExceededError')
+      })
+
+    try {
+      render(<App />)
+      act(() => {
+        repo.updateTask('all-house-clean-windows', { title: 'Unsaved edit' })
+      })
+      expect(screen.getByText(warning)).toBeInTheDocument()
+
+      // The next successful write clears the flag and the strip.
+      setItemSpy.mockRestore()
+      act(() => {
+        repo.updateTask('all-house-clean-windows', { title: 'Saved edit' })
+      })
+      expect(screen.queryByText(warning)).toBeNull()
+    } finally {
+      setItemSpy.mockRestore()
+      warnSpy.mockRestore()
+    }
   })
 })

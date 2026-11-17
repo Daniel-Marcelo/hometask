@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import itemListCsvText from "./csv/item-list.csv?raw";
-import { createLocalRepo } from "./localRepo";
+import { createLocalRepo, isPersistFailed } from "./localRepo";
 import type { Task, TaskRepo } from "./repo";
 
 const STORAGE_KEY = "hometask.v1";
@@ -112,12 +112,28 @@ describe("createLocalRepo mutations", () => {
     expect(garage).toMatchObject({ name: "Garage", sortOrder: 16, archived: false });
 
     repo.deleteTask(added.id);
-    expect(repo.getState().queuedOps).toHaveLength(4);
-    expect(repo.getState().queuedOps[3]).toMatchObject({
+    // The delete compacts away the earlier upsert for that task id.
+    expect(repo.getState().queuedOps).toHaveLength(3);
+    expect(repo.getState().queuedOps[2]).toMatchObject({
       kind: "delete_task",
       taskId: added.id,
     });
     expect(repo.getState().tasks.some((t) => t.id === added.id)).toBe(false);
+  });
+
+  it("compacts queuedOps to one op per task id across repeated updates", () => {
+    const repo = createLocalRepo();
+    for (const title of ["Rename 1", "Rename 2", "Rename 3", "Rename 4"]) {
+      repo.updateTask(CLEAN_WINDOWS_ID, { title });
+    }
+    repo.updateTask(CLEAN_WINDOWS_ID, { notes: "Sand first" });
+
+    const queued = repo.getState().queuedOps;
+    expect(queued).toHaveLength(1);
+    expect(queued[0]).toMatchObject({
+      kind: "upsert_task",
+      task: { id: CLEAN_WINDOWS_ID, title: "Rename 4", notes: "Sand first" },
+    });
   });
 
   it("addTask generates a unique id even for duplicate titles", () => {
@@ -173,8 +189,13 @@ describe("createLocalRepo completeWithUndo", () => {
     expect(restored?.priceCents).toBe(null);
     expect(restored?.dateCompleted).toBe(null);
     expect(restored?.fieldUpdatedAt).toEqual(snapshot?.fieldUpdatedAt);
-    // Undo enqueues a corrective op so remote peers can converge.
-    expect(repo.getState().queuedOps).toHaveLength(opsBefore + 2);
+    // Undo replaces the completion op for the same task id (latest op wins
+    // under LWW), so the queue still holds exactly one op for it.
+    expect(repo.getState().queuedOps).toHaveLength(opsBefore + 1);
+    expect(repo.getState().queuedOps.at(-1)).toMatchObject({
+      kind: "upsert_task",
+      task: { id: CLEAN_WINDOWS_ID, status: "unplanned" },
+    });
   });
 
   it("fresh-stamps the corrective undo op so it wins under per-field LWW", () => {
@@ -256,6 +277,29 @@ describe("createLocalRepo storage failures", () => {
       setItemSpy.mockRestore();
       warnSpy.mockRestore();
       unsubscribe();
+    }
+  });
+
+  it("flags a failed persist and clears the flag on the next successful write", () => {
+    const repo = createLocalRepo();
+    // Baseline: a successful write clears any stale flag from earlier tests.
+    repo.updateTask(CLEAN_WINDOWS_ID, { title: "Baseline" });
+    expect(isPersistFailed()).toBe(false);
+
+    const setItemSpy = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("quota exceeded", "QuotaExceededError");
+    });
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      repo.updateTask(CLEAN_WINDOWS_ID, { title: "Unsaved edit" });
+      expect(isPersistFailed()).toBe(true);
+
+      setItemSpy.mockRestore();
+      repo.updateTask(CLEAN_WINDOWS_ID, { title: "Saved edit" });
+      expect(isPersistFailed()).toBe(false);
+    } finally {
+      setItemSpy.mockRestore();
+      warnSpy.mockRestore();
     }
   });
 

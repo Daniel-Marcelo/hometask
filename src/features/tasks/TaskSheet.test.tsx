@@ -41,6 +41,40 @@ function renderTaskSheet(task: Task) {
 }
 
 describe("TaskSheet", () => {
+  it("the header close button closes the sheet", () => {
+    const onClose = vi.fn();
+    const task = taskBy("Clean Windows");
+
+    render(<TaskSheet task={task} open={true} onClose={onClose} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it("title and notes commit on blur, not on every keystroke", () => {
+    localStorage.removeItem(STORAGE_KEY);
+    const task = taskBy("Fix Ceiling");
+
+    renderTaskSheet(task);
+    const title = screen.getByLabelText("Title");
+    fireEvent.change(title, { target: { value: "Fix Ceiling properly" } });
+    expect(repo.getState().tasks.find((t) => t.id === task.id)?.title).toBe(
+      "Fix Ceiling",
+    );
+    fireEvent.blur(title);
+    expect(repo.getState().tasks.find((t) => t.id === task.id)?.title).toBe(
+      "Fix Ceiling properly",
+    );
+
+    const notes = screen.getByLabelText("Notes");
+    fireEvent.change(notes, { target: { value: "Two coats, then sand" } });
+    expect(repo.getState().tasks.find((t) => t.id === task.id)?.notes).toBe("");
+    fireEvent.blur(notes);
+    expect(repo.getState().tasks.find((t) => t.id === task.id)?.notes).toBe(
+      "Two coats, then sand",
+    );
+  });
+
   it("changing status to Completed via the segmented control persists to repo", () => {
     localStorage.removeItem(STORAGE_KEY);
     const task = taskBy("Clean Windows");

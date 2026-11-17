@@ -1,8 +1,10 @@
 import type { Room, Task } from "../data/parse";
 
-/** The header row parse.ts binds columns by — keep in sync with it. */
+/** The header row parse.ts binds columns by — keep in sync with it. Notes is
+ * an extra trailing column the parser ignores; it exists so free-text task
+ * notes survive the backup export. */
 const HEADER =
-  "Room,Item,Status,Priority,Effort,Can be done now?,Price,Date Planned,Date Completed,Effort Weight";
+  "Room,Item,Status,Priority,Effort,Can be done now?,Price,Date Planned,Date Completed,Effort Weight,Notes";
 
 const STATUS_LABEL: Record<Task["status"], string> = {
   completed: "Completed",
@@ -60,6 +62,7 @@ export function toItemListCsv(rooms: Room[], tasks: Task[]): string {
         task.datePlanned ?? "",
         task.dateCompleted ?? "",
         task.effortWeight.toString(),
+        task.notes,
       ]
         .map(escapeCell)
         .join(","),
@@ -91,5 +94,7 @@ export function downloadBackupCsv(rooms: Room[], tasks: Task[]): void {
   document.body.appendChild(anchor);
   anchor.click();
   anchor.remove();
-  URL.revokeObjectURL(url);
+  // Revoking in the same tick can cancel the download on Firefox/WebKit;
+  // give the browser time to start it.
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }

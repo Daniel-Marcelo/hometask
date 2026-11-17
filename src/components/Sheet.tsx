@@ -22,11 +22,17 @@ export function Sheet({
   onClose,
   title,
   children,
+  footer,
+  showClose = false,
 }: {
   open: boolean
   onClose: () => void
   title: string
   children: ReactNode
+  /** Optional sticky action area below the scrolling body. */
+  footer?: ReactNode
+  /** Render a 44px "×" close button in the header (aria-label "Close"). */
+  showClose?: boolean
 }) {
   const panelRef = useRef<HTMLElement>(null)
   const onCloseRef = useRef(onClose)
@@ -127,8 +133,21 @@ export function Sheet({
         <div className="ht-sheet__handle" aria-hidden="true" />
         <header className="ht-sheet__header">
           <h2 className="ht-sheet__title">{title}</h2>
+          {showClose && (
+            <button
+              type="button"
+              className="ht-sheet__close"
+              aria-label="Close"
+              onClick={onClose}
+            >
+              ×
+            </button>
+          )}
         </header>
         <div className="ht-sheet__body">{children}</div>
+        {footer !== undefined && (
+          <footer className="ht-sheet__footer">{footer}</footer>
+        )}
       </section>
     </div>
   )

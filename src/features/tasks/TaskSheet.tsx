@@ -4,6 +4,7 @@ import { Sheet } from "../../components/Sheet";
 import type { Task } from "../../data/repo";
 import { repo, useRepoState } from "../../data/useRepo";
 import type { CanDoNow, Effort, Priority, Status } from "../../data/types";
+import { needsPricePrompt } from "./pricePrompt";
 import { showUndo } from "./undoStore";
 
 /** Effort label → weight (exact plan map: XS:1, S:2, M:3, L:5, XL:8). */
@@ -41,12 +42,11 @@ function centsToDraft(cents: number | null): string {
   return cents === null ? "" : (cents / 100).toFixed(2);
 }
 
-/** The "Buy"-title price prompt condition: unpriced Buy tasks must be
- * prompted before completion so spend stays honest. */
-function needsPrice(task: Task): boolean {
-  return (
-    task.priceCents == null && task.title.trim().toLowerCase().startsWith("buy")
-  );
+/** A local text draft keyed to its task, so a task switch never shows another
+ * task's pending input. */
+interface TextDraft {
+  taskId: string
+  value: string
 }
 
 const STATUS_OPTIONS: ReadonlyArray<{ value: Status; label: string }> = [
@@ -118,21 +118,26 @@ export function SegmentedControl<T extends string>({
 }
 
 /**
- * The app's primary edit surface for a task: every field commits straight
- * through `repo.updateTask` on change (no local-only state), so the sheet
- * always renders repo truth — it re-reads the task by id from repo state,
- * same discipline as TaskRow.
+ * The app's primary edit surface for a task. The sheet always renders repo
+ * truth — it re-reads the task by id from repo state, same discipline as
+ * TaskRow. Text fields (title, notes, price) draft locally while typing and
+ * commit on blur, so a keystroke never re-persists the whole task.
+ *
+ * Layout: a fixed header (truncated title + a 44px close button), a
+ * scrollable body with every field, and a sticky footer with the primary
+ * completion action and Delete always visible at the bottom.
  *
  * Completion: the big terracotta "Mark as done" button (hidden once
  * completed) goes through `repo.completeWithUndo` and hands the undo to the
  * app-level undo host, exactly like TaskRow. Unpriced "Buy …" tasks get an
  * inline price prompt first: Skip completes without a price, Save & done
  * stores the price then completes. The prompt is keyed to the task id, so a
- * stale flag can never leak across tasks.
+ * stale flag can never leak across tasks. The prompt's action pair replaces
+ * the footer, so Skip / Save & done stay on screen too.
  *
- * Price editing drafts locally while the user types (the field is a plain
+ * Price edits draft locally while the user types (the field is a plain
  * text input — `type="number"` would silently rewrite a trailing-dot draft
- * to "") and commits on blur, so partial input like "80." can never touch
+ * to "") and commit on blur, so partial input like "80." can never touch
  * or wipe the stored price; on blur the draft is dropped and the field
  * snaps back to the committed value.
  */
@@ -155,6 +160,8 @@ export function TaskSheet({
     taskId: string
     value: string
   } | null>(null);
+  const [titleDraft, setTitleDraft] = useState<TextDraft | null>(null);
+  const [notesDraft, setNotesDraft] = useState<TextDraft | null>(null);
   const [promptPrice, setPromptPrice] = useState<{
     taskId: string
     value: string
@@ -164,8 +171,12 @@ export function TaskSheet({
   const priceValue = priceDraftLive
     ? priceDraft!.value
     : centsToDraft(current.priceCents);
+  const titleValue =
+    titleDraft?.taskId === current.id ? titleDraft.value : current.title;
+  const notesValue =
+    notesDraft?.taskId === current.id ? notesDraft.value : current.notes;
   const pricePromptOpen =
-    promptPrice?.taskId === current.id && !completed && needsPrice(current);
+    promptPrice?.taskId === current.id && !completed && needsPricePrompt(current);
 
   const update = (patch: Partial<Task>): void => {
     repo.updateTask(current.id, patch);
@@ -180,7 +191,7 @@ export function TaskSheet({
   /** Start completing: unpriced "Buy …" tasks get the inline price prompt
    * first; everything else completes immediately through the repo contract. */
   const beginComplete = (): void => {
-    if (needsPrice(current)) {
+    if (needsPricePrompt(current)) {
       setPromptPrice({ taskId: current.id, value: "" });
     } else {
       complete();
@@ -244,6 +255,19 @@ export function TaskSheet({
     if (cents !== null && cents !== current.priceCents) update({ priceCents: cents });
   };
 
+  /** Title and notes follow the price field: draft while typing, commit on
+   * blur — one repo write per field, not one per keystroke. */
+  const handleTextBlur = (
+    field: "title" | "notes",
+    draft: TextDraft | null,
+  ): void => {
+    if (field === "title") setTitleDraft(null);
+    else setNotesDraft(null);
+    if (draft === null || draft.taskId !== current.id) return;
+    if (draft.value === current[field]) return;
+    update(field === "title" ? { title: draft.value } : { notes: draft.value });
+  };
+
   const handleDate = (
     field: "datePlanned" | "dateCompleted",
     value: string,
@@ -263,8 +287,48 @@ export function TaskSheet({
     event.preventDefault();
   };
 
+  const footer = pricePromptOpen ? (
+    <div className="ht-prompt__actions">
+      <button type="button" className="ht-btn" onClick={handlePromptSkip}>
+        Skip
+      </button>
+      <button
+        type="button"
+        className="ht-btn ht-btn--accent"
+        onClick={handlePromptSave}
+      >
+        Save &amp; done
+      </button>
+    </div>
+  ) : (
+    <>
+      {!completed && (
+        <button
+          type="button"
+          className="ht-sheet__done"
+          onClick={handleMarkDone}
+        >
+          Mark as done
+        </button>
+      )}
+      <button
+        type="button"
+        className="ht-sheet__danger"
+        onClick={handleDelete}
+      >
+        Delete task
+      </button>
+    </>
+  );
+
   return (
-    <Sheet open={open} onClose={onClose} title={current.title}>
+    <Sheet
+      open={open}
+      onClose={onClose}
+      title={current.title}
+      showClose
+      footer={footer}
+    >
       <form className="ht-form" onSubmit={handleSubmit}>
         <div className="ht-form__field">
           <label className="ht-form__label" htmlFor="task-title">
@@ -273,8 +337,11 @@ export function TaskSheet({
           <input
             id="task-title"
             className="ht-form__input"
-            value={current.title}
-            onChange={(event) => update({ title: event.target.value })}
+            value={titleValue}
+            onChange={(event) =>
+              setTitleDraft({ taskId: current.id, value: event.target.value })
+            }
+            onBlur={() => handleTextBlur("title", titleDraft)}
           />
         </div>
 
@@ -378,8 +445,11 @@ export function TaskSheet({
             id="task-notes"
             className="ht-form__input"
             rows={3}
-            value={current.notes}
-            onChange={(event) => update({ notes: event.target.value })}
+            value={notesValue}
+            onChange={(event) =>
+              setNotesDraft({ taskId: current.id, value: event.target.value })
+            }
+            onBlur={() => handleTextBlur("notes", notesDraft)}
           />
         </div>
 
@@ -402,42 +472,8 @@ export function TaskSheet({
                 }
               />
             </div>
-            <div className="ht-prompt__actions">
-              <button
-                type="button"
-                className="ht-btn"
-                onClick={handlePromptSkip}
-              >
-                Skip
-              </button>
-              <button
-                type="button"
-                className="ht-btn ht-btn--accent"
-                onClick={handlePromptSave}
-              >
-                Save &amp; done
-              </button>
-            </div>
           </div>
         )}
-
-        {!completed && (
-          <button
-            type="button"
-            className="ht-sheet__done"
-            onClick={handleMarkDone}
-          >
-            Mark as done
-          </button>
-        )}
-
-        <button
-          type="button"
-          className="ht-sheet__danger"
-          onClick={handleDelete}
-        >
-          Delete task
-        </button>
       </form>
     </Sheet>
   );

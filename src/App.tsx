@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useSyncExternalStore } from 'react'
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { OfflineBanner } from './components/OfflineBanner'
 import { TabBar } from './components/TabBar'
+import { isPersistFailed, subscribePersistFailed } from './data/localRepo'
 import { AuthGate } from './features/auth/AuthGate'
 import { HomePage } from './features/home/HomePage'
 import { RoomDetailPage } from './features/rooms/RoomDetailPage'
@@ -30,6 +31,14 @@ function useOfflineVisible(): boolean {
 }
 
 /**
+ * Persistence-failure flag from the local repo: true after a failed
+ * localStorage write, cleared by the next successful one.
+ */
+function usePersistFailed(): boolean {
+  return useSyncExternalStore(subscribePersistFailed, isPersistFailed)
+}
+
+/**
  * App shell: centered mobile-first column, 4 bottom tabs, hash-based routing
  * (static-host friendly — no server rewrites needed).
  *
@@ -38,6 +47,7 @@ function useOfflineVisible(): boolean {
  */
 export function App() {
   const offline = useOfflineVisible()
+  const persistFailed = usePersistFailed()
   return (
     <AuthGate>
       <HashRouter>
@@ -52,6 +62,11 @@ export function App() {
             {/* Unknown hashes land home instead of a blank page. */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+          {persistFailed && (
+            <div className="ht-storage-warning" role="status">
+              Storage is full — recent changes may not be saved
+            </div>
+          )}
           <TabBar />
           {/* One app-level undo host outside Routes: survives row unmounts and
               route changes, and only ever shows the newest toast. */}

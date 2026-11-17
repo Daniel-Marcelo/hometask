@@ -262,14 +262,16 @@ export function TaskListPage() {
         </button>
       </div>
 
-      {openTasks.length === 0 ? (
+      {openTasks.length === 0 && completedTasks.length === 0 ? (
         <p style={{ color: "var(--muted)" }}>Nothing matches these filters.</p>
       ) : (
-        <ul aria-label="Tasks" style={sectionList}>
-          {openTasks.map((task) => (
-            <TaskRow key={task.id} task={task} onOpen={openSheet} />
-          ))}
-        </ul>
+        openTasks.length > 0 && (
+          <ul aria-label="Tasks" style={sectionList}>
+            {openTasks.map((task) => (
+              <TaskRow key={task.id} task={task} onOpen={openSheet} />
+            ))}
+          </ul>
+        )
       )}
 
       {completedTasks.length > 0 && (

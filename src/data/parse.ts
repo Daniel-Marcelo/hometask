@@ -130,6 +130,8 @@ export function parseItemListCsv(csv: string): { rooms: Room[]; tasks: Task[] } 
   const datePlannedColumn = columnOf("Date Planned");
   const dateCompletedColumn = columnOf("Date Completed");
   const effortWeightColumn = columnOf("Effort Weight");
+  // Optional trailing column: present in backups, absent from the seed CSV.
+  const notesColumn = headerCells.indexOf("Notes");
   const lastColumn = Math.max(
     roomColumn,
     titleColumn,
@@ -190,7 +192,7 @@ export function parseItemListCsv(csv: string): { rooms: Room[]; tasks: Task[] } 
       priceCents: parsePrice(cells[priceColumn]),
       datePlanned: datePlanned === "" ? null : datePlanned,
       dateCompleted: dateCompleted === "" ? null : dateCompleted,
-      notes: "",
+      notes: notesColumn === -1 ? "" : (cells[notesColumn] ?? ""),
       createdAt: now,
       updatedAt: now,
       fieldUpdatedAt: {},

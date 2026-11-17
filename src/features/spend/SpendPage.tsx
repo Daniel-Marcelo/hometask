@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { ProgressBar } from "../../components/ProgressBar";
 import { StatTile } from "../../components/StatTile";
 import { useRepoState } from "../../data/useRepo";
+import { useAuth } from "../../lib/auth";
 import { computeDashboard } from "../../lib/dashboard";
 
 /** Pounds, whole, comma thousands: 485800 → "£4,858". */
@@ -65,14 +66,41 @@ const mutedMeta = {
   color: "var(--muted)",
 } as const;
 
+/** Account row at the page foot: a muted line with a ≥44px sign-out target. */
+const accountRow = {
+  display: "flex",
+  alignItems: "center",
+  flexWrap: "wrap",
+  gap: 4,
+  minHeight: 44,
+  marginTop: 24,
+  color: "var(--muted)",
+  fontSize: 13,
+} as const;
+
+const signOutButton = {
+  minHeight: 44,
+  padding: "0 4px",
+  border: "none",
+  background: "none",
+  color: "var(--muted)",
+  font: "inherit",
+  fontSize: 13,
+  textDecoration: "underline",
+  cursor: "pointer",
+} as const;
+
 /**
  * Spend: the recorded-costs headline (plus the budgeted-not-spent line
  * when anything is still unspent), per-room bars relative to the biggest
  * spender, and every completed priced purchase newest first. Rows are
  * informational — nothing here is tappable, so nothing fakes a button.
+ * The one action is the account row at the bottom: who is signed in, and
+ * the way out.
  */
 export function SpendPage() {
   const { rooms, tasks } = useRepoState();
+  const { email, signOut } = useAuth();
 
   const dashboard = useMemo(
     () => computeDashboard(rooms, tasks),
@@ -156,6 +184,16 @@ export function SpendPage() {
             </li>
           ))}
         </ul>
+      )}
+
+      {email !== null && (
+        <div style={accountRow}>
+          <span>Signed in as {email}</span>
+          <span aria-hidden="true">·</span>
+          <button type="button" onClick={signOut} style={signOutButton}>
+            Sign out
+          </button>
+        </div>
       )}
     </main>
   );

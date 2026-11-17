@@ -132,6 +132,20 @@ describe("TaskListPage", () => {
     expect(screen.queryByText(/Completed \(/)).toBeNull();
   });
 
+  it('status filter "Completed" shows the completed section without the empty-state message', () => {
+    renderTasks();
+
+    fireEvent.change(screen.getByRole("combobox", { name: "Status" }), {
+      target: { value: "completed" },
+    });
+
+    // No open tasks, but the completed section is populated: no contradiction.
+    expect(screen.queryByText("Nothing matches these filters.")).toBeNull();
+    expect(
+      screen.getByRole("button", { name: "Completed (13)" }),
+    ).toBeInTheDocument();
+  });
+
   it('the "Ready now" toggle keeps the 40 can-do-now open tasks', () => {
     renderTasks();
 

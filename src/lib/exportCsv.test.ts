@@ -5,7 +5,7 @@ import type { Room, Task } from "../data/parse";
 import { downloadBackupCsv, toItemListCsv } from "./exportCsv";
 
 const HEADER =
-  "Room,Item,Status,Priority,Effort,Can be done now?,Price,Date Planned,Date Completed,Effort Weight";
+  "Room,Item,Status,Priority,Effort,Can be done now?,Price,Date Planned,Date Completed,Effort Weight,Notes";
 
 /** A fully-populated synthetic task for escaping/format edge cases. */
 function makeTask(overrides: Partial<Task> = {}): Task {
@@ -84,8 +84,22 @@ describe("toItemListCsv", () => {
     );
     const row = csv.split("\n")[1];
     expect(row).toBe(
-      'Test Room,"Fix, the ""roof"" panels",Planned,Medium,M,Yes,"£1,234.56",2026-11-15,,3',
+      'Test Room,"Fix, the ""roof"" panels",Planned,Medium,M,Yes,"£1,234.56",2026-11-15,,3,',
     );
+  });
+
+  it("round-trips a note with a comma and newline through export → parse", () => {
+    const notes = "Needs 2 coats, then sand\nand varnish";
+    const csv = toItemListCsv([ROOM], [makeTask({ notes })]);
+
+    // Escaped as one quoted cell, so the record does not split at the comma
+    // or the newline inside it.
+    expect(csv).toContain(`"Needs 2 coats, then sand\nand varnish"`);
+
+    const reparsed = parseItemListCsv(csv);
+    expect(reparsed.tasks).toHaveLength(1);
+    expect(reparsed.tasks[0].title).toBe("Test Item");
+    expect(reparsed.tasks[0].notes).toBe(notes);
   });
 });
 
@@ -95,6 +109,7 @@ describe("downloadBackupCsv", () => {
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
+    vi.useRealTimers();
   });
 
   it("downloads hometask-backup-<local date>.csv with the full CSV text", async () => {
@@ -114,6 +129,7 @@ describe("downloadBackupCsv", () => {
         anchors.push(this);
       });
 
+    vi.useFakeTimers();
     downloadBackupCsv(rooms, tasks);
 
     const now = new Date();
@@ -125,7 +141,12 @@ describe("downloadBackupCsv", () => {
     const anchor = anchors[0];
     expect(anchor?.getAttribute("download")).toBe(expectedName);
     expect(click).toHaveBeenCalledTimes(1);
+    // Revoked only after the browser has had a tick to start the download.
+    expect(URL.revokeObjectURL).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1000);
     expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:mock-url");
+    vi.useRealTimers();
+
     expect(blob?.type).toBe("text/csv;charset=utf-8");
     expect(await blob?.text()).toBe(toItemListCsv(rooms, tasks));
   });
