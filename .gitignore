@@ -30,3 +30,4 @@ pnpm-debug.log*
 lerna-debug.log*
 dist-ssr
 *.local
+.vercel
