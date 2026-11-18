@@ -97,11 +97,11 @@ describe("HomePage", () => {
 
     // Counts survive the compact form: Utility Room is 2/2, Hallway 3/7.
     const utility = within(rooms).getByRole("button", {
-      name: "Open Utility Room",
+      name: "Open Utility Room · 2/2",
     });
     expect(within(utility).getByText("2/2")).toBeInTheDocument();
     const hallway = within(rooms).getByRole("button", {
-      name: "Open Hallway",
+      name: "Open Hallway · 3/7",
     });
     expect(within(hallway).getByText("3/7")).toBeInTheDocument();
   });
@@ -109,7 +109,7 @@ describe("HomePage", () => {
   it("tapping a room chip navigates to /rooms/:id", () => {
     const { pathname } = renderHome();
     fireEvent.click(
-      screen.getByRole("button", { name: "Open Utility Room" }),
+      screen.getByRole("button", { name: "Open Utility Room · 2/2" }),
     );
     expect(pathname()).toBe("/rooms/utility-room");
   });

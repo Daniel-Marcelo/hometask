@@ -171,7 +171,7 @@ export function HomePage() {
           <li key={room.roomId}>
             <button
               type="button"
-              aria-label={`Open ${room.name}`}
+              aria-label={`Open ${room.name} · ${room.completed}/${room.total}`}
               style={chip}
               onClick={() => navigate(`/rooms/${room.roomId}`)}
             >
