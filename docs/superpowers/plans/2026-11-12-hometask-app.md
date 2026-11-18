@@ -164,7 +164,7 @@ export const repo: TaskRepo                               // module singleton us
 - Consumes: `Sheet`, `repo` (Tasks 4–5); `Task` type.
 - Produces: `<TaskSheet task={Task} open={boolean} onClose={() => void} />`. Editable fields: title (text), room (select from rooms), status (segmented control 4 values), priority (segmented 4), effort (segmented 5 labels — selecting a label auto-sets `effortWeight` via map `XS:1,S:2,M:3,L:5,XL:8`), canDoNow (segmented Yes/No/N/A), price (numeric input, pounds, stores cents), datePlanned, dateCompleted (date inputs), notes (textarea). Big terracotta "Mark as done" button when not completed. Delete (confirm) at bottom. Every edit commits through `repo.updateTask`.
 - Price prompt: after "Mark as done", if `title` starts with "Buy" and `priceCents == null`, show inline price field + "Skip" (skip completes without price); entering a price saves it then completes. If task already priced or non-Buy, completes immediately.
-- `NewTaskSheet`: title, room (default: first room), priority, effort, canDoNow defaults (`planned`, `medium`, `M`, `yes`); creates via `repo.addTask`.
+- `NewTaskSheet({ defaultRoomId?: string })`: title, room (default: `defaultRoomId` or first room), priority, effort, canDoNow defaults (`planned`, `medium`, `M`, `yes`); creates via `repo.addTask`.
 
 - [ ] **Step 1: Write failing tests:** changing status to Completed via segmented control persists to repo; "Mark as done" on unpriced "Buy Rug" shows price field, Skip → completed with `priceCents` still null, entering "80" → completed with `priceCents: 8000`; "Mark as done" on "Paint Stairs" completes with no prompt; effort select `L` sets `effortWeight: 5`; delete removes task; NewTaskSheet creates a task with chosen room/priority.
 - [ ] **Step 2:** Run — FAIL. **Step 3:** Implement both sheets. **Step 4:** Run — PASS. **Step 5:** Commit `feat: task bottom sheet with price prompt and full editing`.
@@ -192,7 +192,7 @@ export const repo: TaskRepo                               // module singleton us
 - Consumes: `TaskRow`, `TaskSheet`, `NewTaskSheet`, `Fab`, repo state.
 - Produces: route `/tasks`. Sticky filter row: room select (All + 16 rooms), status select (All + 4), priority select (All + 4), "Ready now" toggle. Default sort: priority rank, then effort weight, then room. List of `TaskRow`s; tap opens `TaskSheet`; Fab opens `NewTaskSheet`; completed tasks collapse into a muted "Completed (n)" section at the bottom.
 
-- [ ] **Step 1: Write failing test:** default list hides nothing but counts "Completed (13)"; room filter "Hallway" shows exactly 7 tasks; status filter "Planned" shows 3; "Ready now" toggle shows 40; Fab opens NewTaskSheet.
+- [ ] **Step 1: Write failing test:** default list shows "Completed (13)"; room filter "Hallway" shows exactly 7 tasks; status filter "Planned" shows 5 (the CSV has 5 Planned tasks — the sheet's dashboard tab is stale on this count); "Ready now" toggle shows 40; Fab opens NewTaskSheet.
 - [ ] **Step 2:** Run — FAIL. **Step 3:** Implement. **Step 4:** Run — PASS. **Step 5:** Commit `feat: filterable full task list`.
 
 ### Task 10: Rooms page + room detail
@@ -273,7 +273,7 @@ export function useAuth(): AuthState & { signIn(email: string): Promise<void>; s
 
 **Interfaces:**
 - Consumes: `TaskRepo` interface (Task 4); types (Task 2).
-- Produces: `export function createSupabaseRepo(): TaskRepo` (throws descriptive error if `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` missing); `repo.ts` singleton selects `createSupabaseRepo()` when env vars present else `createLocalRepo()`. SQL: `rooms` and `tasks` tables matching TS types exactly (`price_cents bigint`, `field_updated_at jsonb`), RLS `authenticated`-only on both, `updated_at` triggers; seed script uploads parsed CSV rows.
+- Produces: `export function createSupabaseRepo(): TaskRepo` (throws descriptive error if `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` missing); `repo.ts` singleton selects `createSupabaseRepo()` when env vars present else `createLocalRepo()`. SQL: `rooms` and `tasks` tables matching TS types exactly (`price_cents bigint`, `field_updated_at jsonb`), `updated_at` triggers; **server-side allowlist enforcement**: an `allowed_emails` table plus RLS policies that only admit rows when `auth.jwt() ->> 'email'` is in `allowed_emails` (client-side allowlist alone is not security); seed script uploads parsed CSV rows.
 
 - [ ] **Step 1: Write failing unit test:** with fake client, `updateTask` writes patched fields + bumps `fieldUpdatedAt`; realtime callback updates store; queued ops flush on `online` event.
 - [ ] **Step 2:** Run — FAIL. **Step 3:** Implement migration SQL + adapter + seed script + `.env.example` (`VITE_SUPABASE_URL=`, `VITE_SUPABASE_ANON_KEY=`, `VITE_ALLOWED_EMAILS=`).

@@ -38,7 +38,7 @@ A couple just moved into a house and tracked their renovation in a Google Sheet 
 
 ## Decided with the user
 
-- Structure: **Command Center** home — stat tiles (progress %, spend, to-go), per-room progress bars, "Ready now" list below. Bottom tabs: **Home · Tasks · Rooms · Spend** (the user picked this over Focus-First and Rooms-First layouts).
+- Structure: **Command Center** home — stat tiles (progress %, spend, to-go), a compact room-chips summary row with "See all rooms" (user decision 2026-11-17; replaced per-room progress bars so the Ready-now list fits the first viewport), "Ready now" list below. Bottom tabs: **Home · Tasks · Rooms · Spend** (the user picked this over Focus-First and Rooms-First layouts).
 - Visual direction: **Warm Craftsman** — cream/warm-neutral ground, terracotta + olive accents, characterful serif display type, feels like a home project not a SaaS tool (user picked this over Clean/Modern and Bold/Energetic).
 - Interaction: **combo** — checkbox on a list row completes instantly (with undo); tapping the row opens a bottom sheet with all fields and a big "Mark as done" action.
 - Data: Supabase + magic-link auth; one-time CSV import; sheet becomes frozen backup refreshed via in-app CSV export.
@@ -70,7 +70,7 @@ Tables: `rooms` (id, name, sort_order, archived), `tasks` (id, room_id, title, s
 - **Job/audience:** a partner, standing in a room or on the sofa on a weekend morning, deciding and doing today's jobs; secondarily checking progress and money.
 - **Outcome:** mark tasks done in seconds; see today's ready-now work instantly; keep spend honest; both partners trust the same data.
 - **Visual direction (user-pinned): Warm Craftsman.** Warm cream ground (#faf6f0), warm ink (#3d2c1e), muted brown text (#6b5a48), terracotta accent (#b45309) for urgency/primary actions, olive-green (#4d7c0f) for success/completion, hairline borders in warm tan (#e8ddd0), serif display (e.g., a characterful serif like Fraunces-class) for headings/numbers, humanist sans for body/UI. Cards: white on cream, soft radius (10–14px), thin warm borders, no heavy shadows. Urgency encoded by terracotta left-rules/chips, not alarm-red everywhere. This direction was chosen from three presented mockups; it is user-pinned and beats any category-default look.
-- **Focal moment:** the Home first viewport — progress ring + spend + to-go tiles, room bars, and the top of the Ready-now list, all within ~640px of scroll.
+- **Focal moment:** the Home first viewport — progress ring + spend + to-go tiles, a compact room-chips summary (progress counts on the chips, full bars on the Rooms pages), and the top of the Ready-now list, all within ~640px of scroll (user decision 2026-11-17: chips replace room bars; measured Ready-now top ≈ 390px).
 - **Signature interaction:** the instant-complete checkbox with a satisfying micro-animation and undo snackbar; the task bottom sheet slides up thumb-reachable with a large terracotta "Mark as done".
 - **States to design:** empty rooms, all-done celebration moment (restrained), offline banner, loading skeletons, error toasts, magic-link sign-in and email-sent confirmation, undo toast.
 - **Anti-patterns:** no alarm-red spam, no gamified confetti every tap, no dark-mode-first, no desktop-only patterns on mobile.
